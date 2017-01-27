@@ -182,7 +182,8 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
         # For each group, compute probs of each conditions
         nbr_groups = len(unique_grp)
         nbr_conds = Nj
-        probas = np.zeros((nbr_groups, nbr_conds))
+        # TODO: there is a problem here
+        probas = np.zeros((nbr_groups,))
         for g in range(nbr_groups):
             s = np.sum(count_by_cond_orig[conds_of_grp[g]])
             probas[g] = count_by_cond_orig[conds_of_grp[g]] / s
