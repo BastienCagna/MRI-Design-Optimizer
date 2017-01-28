@@ -1,2 +1,5 @@
 # MRI-Design-Optimizer
-Provides a pipeline that computes the more efficient design of a MRI experiment
+
+[Not ready to be used yet]
+
+This framework (will) provides a pipeline that compute the more efficient design of a brain MRI experiment.
