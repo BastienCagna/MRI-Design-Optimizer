@@ -148,7 +148,7 @@ cond_of_files = np.arange(36)
 iti_file = "/hpc/banco/bastien.c/data/optim/identification/ITIs.npy"
 output_path = "/hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/"
 tr = 0.955
-nbr_designs = 100
+nbr_designs = 10
 
 write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrasts_names, files_list,
                       files_path, iti_file, nbr_designs, tmp, tmn, tr, output_path)

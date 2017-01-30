@@ -42,13 +42,10 @@ def create_soa_file():
     # plt.show()
 
 
-# TODO: Make a function that give the design matrix
-def design_matrix(tr, conditions, onsets, durations, final_soa):
+def design_matrix(tr, conditions, onsets, final_isi):
     # frame times
-    # TODO:   ----- /!\ total duration has changed !!! ----------
-    total_duration = onsets[-1]  + final_soa #+ durations[conditions[-1]]
+    total_duration = onsets[-1] + final_isi
     n_scans = np.ceil(total_duration/tr)
-    # print('Total duration: %ds, Numbers of scans: %d' % (total_duration, n_scans))
     frame_times = np.arange(n_scans) * tr
 
     # event-related design matrix
@@ -59,7 +56,6 @@ def design_matrix(tr, conditions, onsets, durations, final_soa):
     return X
 
 
-# TODO: Make a function that compute the desin matrix's efficiency
 def efficiency(xmatrix, c):
     xcov = np.dot(xmatrix.T, xmatrix)
     ixcov = np.linalg.inv(xcov)
@@ -82,7 +78,7 @@ def find_in_tmp(tmp, needed):
     return -1
 
 
-def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_max=1000):
+def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_max=1000, verbose=False):
     """
     Generate nbr_seq sequences of events.
     :param count_by_cond:
@@ -106,6 +102,13 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
         conds_of_grp.append(np.argwhere(np.array(groups) == grp).flatten())
         count_by_grp_orig.append(np.sum(count_by_cond_orig * (groups == grp)))
 
+    # For each group, compute probs of each conditions
+    nbr_groups = len(unique_grp)
+    probas = []
+    for g in range(nbr_groups):
+        s = np.sum(count_by_cond_orig[conds_of_grp[g]])
+        probas.append(count_by_cond_orig[conds_of_grp[g]] / s)
+
     if Nj != tmn.shape[1]:
         warnings.warn("Conditions count doesn't match TMn's columns count.")
     # TODO: resolve the comparison problem
@@ -119,9 +122,11 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
     tentatives = 0
     i = 0
     while i < nbr_designs:
-        # print("%f - %d" % (time.time()-t, i))
+        if verbose is True and np.mod(i, nbr_designs/10) == 0:
+            print("%f - %d" % (time.time()-t, i))
+
         # Vector of events
-        seq = -1 * np.ones((nbr_events,), dtype=int)
+        seq = -1 * np.ones((nbr_events, 1), dtype=int)
         # Vector giving the event's groups
         seq_grp = -1 * np.ones((nbr_events,), dtype=int)
 
@@ -179,15 +184,6 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
             raise ConvergenceError("The design didn't succeded to complete during groups attribution.")
         seq_grp = np.array(seq_grp)
 
-        # For each group, compute probs of each conditions
-        nbr_groups = len(unique_grp)
-        nbr_conds = Nj
-        # TODO: there is a problem here
-        probas = np.zeros((nbr_groups,))
-        for g in range(nbr_groups):
-            s = np.sum(count_by_cond_orig[conds_of_grp[g]])
-            probas[g] = count_by_cond_orig[conds_of_grp[g]] / s
-
         # If the sequence can not be finished, try several time
         for k1 in range(iter_max):
             seq_completed = True
@@ -216,8 +212,6 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
             if tentatives > iter_max:
                 raise ConvergenceError("Impossible to create new different design in {} iterations.".format(iter_max))
         else:
-            if np.mod(i, 1000)==0:
-                print("designs creation at {}s: {}/{} completed".format(time.time()-t, i+1, nbr_designs))
             seqs[i] = seq.T
             i += 1
 
@@ -260,7 +254,7 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
     durations = []
     for file in files_list:
         fs, x = wf.read(op.join(files_path, file))
-        durations.append(len(x)*fs)
+        durations.append(len(x)/float(fs))
     durations = np.array(durations)
 
     # Save conditions and onsets
@@ -286,146 +280,8 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
     return True
 
 
-# 2 - Create designs
-# def randomized_onsets(params_file, designs_file):
-#     params = pickle.load(open(params_file, "rb"))
-#     nbr_seqs = params['nbr_designs']
-#     nbr_events = np.sum(params['cond_counts'])
-#     conds = generate_sequence(params['cond_counts'], params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'])
-#
-#     # Create a new onset vector by drawing new event independently of the condition index
-#     SOAs = np.random.random((nbr_seqs, nbr_events)) * (params['SOAmax'] - params['SOAmin']) + params['SOAmin']
-#     onsets = np.zeros((nbr_seqs, nbr_events))
-#     tril_inf = np.tril(np.ones((nbr_events, nbr_events)), 0)
-#     for i in range(nbr_seqs):
-#         onsets[i] = np.dot(tril_inf, SOAs[i])
-#
-#     np.save(designs_file, [onsets, conds])
-#     return
-#
-#
-# def randomized_soa_order(params_file, designs_file, SOAs_file, postStimTime=0):
-#     params = pickle.load(open(params_file, "rb"))
-#     nbr_seqs = params['nbr_designs']
-#     nbr_events = int(np.sum(params['cond_counts']))
-#     conds = generate_sequence(params['cond_counts'], params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'])
-#
-#     # Create a new onset vector by drawing new event independently of the condition index
-#     SOAs_orig = np.load(SOAs_file)
-#     onsets = np.zeros((nbr_seqs, nbr_events))
-#     tril_inf = np.tril(np.ones((nbr_events, nbr_events)), 0)
-#     for i in range(nbr_seqs):
-#         SOAs_indexes = np.random.permutation(nbr_events)
-#         SOAs = SOAs_orig[SOAs_indexes]
-#         onsets[i] = np.dot(tril_inf, SOAs)
-#
-#     np.save(designs_file, [onsets, conds])
-#     return
-#
-#
-# def randomized_isi_order(params_file, designs_file, isi_file, start_at=2.0, postStimTime=0):
-#     params = pickle.load(open(params_file, "rb"))
-#     nbr_seqs = params['nbr_designs']
-#     nbr_events = int(np.sum(params['cond_counts']))
-#     durations = params['cond_durations']
-#     conds = generate_sequence(params['cond_counts'], params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'])
-#
-#     # Create a new onset vector by drawing new event independently of the condition index
-#     isi_orig = np.load(isi_file)
-#     onsets = np.zeros((nbr_seqs, nbr_events))
-#     for i in range(nbr_seqs):
-#         isi_indexes = np.random.permutation(nbr_events-1)
-#         isi_list = isi_orig[isi_indexes]
-#
-#         onsets[i, 0] = start_at
-#         for j in range(1, nbr_events):
-#             onsets[i, j] = onsets[i, j-1] + durations[conds[i, j-1]] + isi_list[j-1] + postStimTime
-#
-#     np.save(designs_file, [onsets, conds])
-#     return
-#
-#
-# def voice_calib_order(params_file, designs_file, start_at=2.0, postStimTime=0):
-#     params = pickle.load(open(params_file, "rb"))
-#     nbr_seqs = params['nbr_designs']
-#     nbr_events = int(np.sum(params['cond_counts']))
-#     cond_names = params['cond_names']
-#     output_path = params['output_path']
-#
-#     infos = pd.read_csv("/hpc/banco/bastien.c/data/optim/VC/infos.csv")
-#     filenames = infos['file name']
-#     durations = infos['duration']
-#     conditions = infos['condition']
-#
-#     file_indexes = []
-#     conds = []
-#
-#     for i in range(nbr_seqs):
-#         if np.mod(i, 500)==0:
-#             print(i)
-#         tirage = np.random.permutation(nbr_events)
-#         file_indexes.append(tirage)
-#         row_cond = []
-#         for t in tirage:
-#             file = filenames[t]
-#             row_cond.append(np.where(conditions[t]==cond_names)[0][0])
-#         conds.append(row_cond)
-#
-#
-#     # conds = generate_sequence(params['cond_counts'], params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'])
-#     np.save(op.join(output_path, "conditions"), conds)
-#
-#     infos = pd.read_csv("/hpc/banco/bastien.c/data/optim/VC/infos.csv")
-#     filenames = infos['file name']
-#     durations = infos['duration']
-#     conditions = infos['condition']
-#
-#     cond_nums = np.arange(len(params['cond_counts']))
-#     conditions_nums = []
-#     for c in conditions:
-#         for i_tmp in range(len(params['cond_counts'])):
-#             if cond_names[i_tmp] == c:
-#                 i_c = i_tmp
-#                 break
-#
-#         conditions_nums.append(cond_nums[i_c])
-#     conditions_nums = np.array(conditions_nums)
-#
-#     files_orders = []
-#     durations_tab = []
-#     for i, seq in enumerate(conds):
-#         file_order = []
-#         used_files = np.zeros((nbr_events,))
-#         durations_row = []
-#         for cond in seq:
-#             i_file = np.where((used_files==0) * (conditions_nums==cond))[0][0]
-#
-#             file_order.append(filenames[i_file])
-#             used_files[i_file] = 1
-#             durations_row.append(durations[i_file])
-#         durations_tab.append([durations_row])
-#         files_orders.append(file_order)
-#     np.save(op.join(output_path, "file_orders"), files_orders)
-#     np.save(op.join(output_path, "durations_tab"), durations_tab)
-#     # durations_tab = np.array(durations)
-#
-#     # Create a new onset vector by drawing new event independently of the condition index
-#     isi_orig = np.load("/hpc/banco/bastien.c/data/optim/VC/ITIs_const.npy")
-#     np.save(op.join(output_path, "ITIs"), isi_orig)
-#     onsets = np.zeros((nbr_seqs, nbr_events))
-#     for i in range(nbr_seqs):
-#         iti_indexes = np.random.permutation(nbr_events-1)
-#         iti_list = isi_orig[iti_indexes]
-#
-#         onsets[i, 0] = start_at
-#         for j in range(1, nbr_events):
-#             onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][0][j-1]) + iti_list[j-1] # .replace(',', '.')
-#
-#     np.save(designs_file, [onsets, conds])
-#     return
-#
-
-def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, postStimTime=0):
+def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, postStimTime=0,
+                     verbose=False):
     params = pickle.load(open(op.join(params_path, params_file), "rb"))
     nbr_seqs = params['nbr_designs']
     cond_counts = params['cond_counts']
@@ -436,9 +292,14 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
     nbr_events = int(np.sum(cond_counts))
 
     # Get condtions order of all desgins
-    conds = generate_sequence(cond_counts, params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'])
+    if verbose:
+        print('Generate conditions orders')
+    conds = generate_sequence(cond_counts, params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'],
+                              verbose=verbose)
 
     # Get file order of each designs and so get duration order also (will be used to generate design matrix)
+    if verbose:
+        print("Creating file list of each desing")
     files_orders = []
     durations_tab = []
     for i, seq in enumerate(conds):
@@ -448,19 +309,21 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
         durations_row = []
         file_order = []
         for cond in seq:
-            i_file = np.where((used_files==0) * (cond_of_files==cond))#[0][0]
-
+            i_files = np.where((used_files==0) * (cond_of_files==cond))[0]
+            i_file = np.random.choice(i_files)
             file_order.append(filenames[i_file])
             used_files[i_file] = 1
             durations_row.append(durations[i_file])
 
-        durations_tab.append([durations_row])
+        durations_tab.append(durations_row)
         files_orders.append(file_order)
 
     # np.save(op.join(output_path, "file_orders"), files_orders)
     # np.save(op.join(output_path, "durations_tab"), durations_tab)
 
     # Create a new onset vector by drawing new event independently of the condition index
+    if verbose:
+        print("Generating ITI orders")
     iti_orig = np.load(params['ITI_file'])
     onsets = np.zeros((nbr_seqs, nbr_events))
     isi_maxs = np.zeros((nbr_seqs,))
@@ -470,7 +333,7 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
 
         onsets[i, 0] = start_at
         for j in range(1, nbr_events):
-            onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][0][j-1]) + iti_list[j-1] # .replace(',', '.')
+            onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][j-1]) + iti_list[j-1] # .replace(',', '.')
 
         # Find maximal isi (for the filtering of design matrix)
         isi_v = onsets[i, 1:] - onsets[i, :-1]
@@ -479,81 +342,27 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
     # Save designs
     designs = {"onsets": onsets, "conditions": conds, "files": files_orders, "durations": durations_tab,
                'max_ISIs': isi_maxs}
-    pickle.dump(designs, op.join(params['output_path'], designs_file))
+    pickle.dump(designs, open(op.join(params['output_path'], designs_file), "wb"))
+    if verbose:
+        print("Designs have been saved to: " + op.join(params['output_path'], designs_file))
     # np.save(designs_file, [onsets, conds, files_orders, durations_tab])
     return
 
 
-def voice_calib_order2(params_file, designs_file, start_at=2.0, postStimTime=0):
-    params = pickle.load(open(params_file, "rb"))
-    nbr_seqs = params['nbr_designs']
-    nbr_events = int(np.sum(params['cond_counts']))
-    cond_names = params['cond_names']
-    output_path = params['output_path']
-
-    conds = np.load(op.join(output_path, "conditions.npy"))
-
-    infos = pd.read_csv("/hpc/banco/bastien.c/data/optim/VC/infos.csv")
-    filenames = infos['file name']
-    durations = infos['duration']
-    conditions = infos['condition']
-
-    # cond_nums = np.arange(len(params['cond_counts']))
-    # conditions_nums = []
-    # for c in conditions:
-    #     for i_tmp in range(len(params['cond_counts'])):
-    #         if cond_names[i_tmp] == c:
-    #             i_c = i_tmp
-    #             break
-    #
-    #     conditions_nums.append(cond_nums[i_c])
-    # conditions_nums = np.array(conditions_nums)
-
-    files_orders = np.load(op.join(output_path, "file_orders.npy"))
-    # durations_tab = []
-    t =time.time()
-    # for i, seq in enumerate(conds):
-    #     if np.mod(i, 100) == 0:
-    #         print("{}: {}".format(time.time()-t, i))
-    #     durations_row = []
-    #     for file in files_orders[i]:
-    #         i_file = np.where((filenames==file))[0][0]
-    #         durations_row.append(durations[i_file])
-    #     durations_tab.append([durations_row])
-    durations_tab = np.load(op.join(output_path, "duratiosn_tab.npy"))
-
-    # Create a new onset vector by drawing new event independently of the condition index
-    # isi_orig = np.load("/hpc/banco/bastien.c/data/optim/VC/ITIs.npy")
-    np.save(op.join(output_path, "ISIs"), isi_orig)
-    onsets = np.zeros((nbr_seqs, nbr_events))
-    for i in range(nbr_seqs):
-        if np.mod(i, 100) == 0:
-            print("onsets - {}: {}".format(time.time()-t, i))
-        isi_indexes = np.random.permutation(nbr_events-1)
-        isi_list = isi_orig[isi_indexes]
-
-        onsets[i, 0] = start_at
-        for j in range(1, nbr_events):
-            onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][0][j-1].replace(',', '.')) + isi_list[j-1] + postStimTime
-
-    np.save(designs_file, [onsets, conds])
-    return
-
-
-# 3 - Compute efficiencies
-def compute_efficiencies(param_filename, designs_file, output_file, nf=9):
+def compute_efficiencies(param_path, params_file="params.p", designs_file="designs.p", output_file="efficiencies.npy",
+                         nf=9, verbose=False):
     # Read parameters
-    params = pickle.load(open(param_filename, "rb"))
-    durations = params['cond_durations']
+    params = pickle.load(open(op.join(param_path, params_file), "rb"))
+    output_path = params['output_path']
     tr = params['tr']
     nbr_tests = params['nbr_designs']
     contrasts = params['contrasts']
 
     # Read designs
-    # [onsets, conditions] = np.load(designs_file)
-    designs = pickle.load(designs_file)
+    designs = pickle.load(open(op.join(output_path, designs_file), "rb"))
     onsets = designs['onsets']
     conditions = np.array(designs['conditions'], dtype=int)
+    durations_tab = designs['durations']
     isi_maxs = designs['max_ISIs']
 
     nbr_contrasts = contrasts.shape[0]
@@ -568,7 +377,7 @@ def compute_efficiencies(param_filename, designs_file, output_file, nf=9):
     t = time.time()
     for (i, c) in enumerate(contrasts):
         for k in range(nbr_tests):
-            # Construct the proper filter
+            # Construct the proper filte
             fc2 = 1 / isi_maxs[k]
             w2 = 2 * fc2 / fs
             if w2 > 1:
@@ -577,11 +386,11 @@ def compute_efficiencies(param_filename, designs_file, output_file, nf=9):
             b, a = signal.iirfilter(nf, [w1, w2], rs=80, rp=0, btype='band', analog=False, ftype='butter')
 
             # compute efficiency of all examples
-            if np.mod(k, nbr_tests / 10) == 0:
+            if verbose and np.mod(k, nbr_tests / 10) == 0:
                 print("%ds: contrast %d/%d - efficiency evaluation %d/%d" %
                       (time.time() - t, i + 1, nbr_contrasts, k + 1, nbr_tests))
 
-            X = design_matrix(tr, conditions[k], onsets[k], durations, final_soa=isi_maxs[k])
+            X = design_matrix(tr, conditions[k], onsets[k], final_isi=durations_tab[k, -1])
 
             # Filter each columns to compute efficiency only on the bold signal bandwidth
             for j in range(X.shape[1] - 1):
@@ -590,7 +399,9 @@ def compute_efficiencies(param_filename, designs_file, output_file, nf=9):
             # Compute efficiency of this design for this contrast
             efficiencies[i, k] = efficiency(X, c)
 
-    np.save(op.join(output_file), efficiencies)
+    np.save(op.join(output_path, output_file), efficiencies)
+    if verbose:
+        print("Efficiencies saved at: " + op.join(output_path, output_file))
     return
 
 
@@ -617,21 +428,10 @@ if __name__ == "__main__":
     # elif function == "voice_calib_order2":
     #         voice_calib_order2(sys.argv[2], sys.argv[3], float(sys.argv[4]), float(sys.argv[5]))
     if function == "generate_designs":
-        generate_designs(sys.argv[2])
+        generate_designs(sys.argv[2], verbose=True)
 
     elif function == 'compute_efficiencies':
-        """ example : python /hpc/banco/bastien.c/python/designer/design_efficiency.py compute_efficiencies
-        /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/params.p
-        /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/designs.npy
-        /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/efficiencies.npy
-
-        frioul_batch '/hpc/crise/anaconda3/bin/python3 /hpc/banco/bastien.c/python/designer/design_efficiency.py
-        compute_efficiencies /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/params.p
-        /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/designs.npy
-        /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/efficiencies.npy' --nodes 20 -c 12
-
-        """
-        compute_efficiencies(sys.argv[2], sys.argv[3], sys.argv[4])
+        compute_efficiencies(sys.argv[2], verbose=True)
 
     else:
         warnings.warn("Unrecognized function '{}'".format(function))

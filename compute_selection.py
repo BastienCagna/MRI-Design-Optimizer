@@ -31,7 +31,7 @@ def find_best_design(efficiencies, contrasts, n=1):
     return i_best
 
 
-def find_middle_design(efficiencies, contrasts, n=1):
+def find_standards_design(efficiencies, contrasts, n=1):
     nbr_tests = efficiencies.shape[1]
     nbr_contrasts = contrasts.shape[0]
 
@@ -149,14 +149,14 @@ if __name__ == "__main__":
     #
     # i_best, i_worst_best = find_best_design(eff[0], contrasts)
 
-    path = "/hpc/banco/bastien.c/data/optim/VC/iti_const/"
+    path = "/hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/"
     eff = np.load(op.join(path, "efficiencies.npy"))
-    params = pickle.load((open(op.join(path, "params.p"), "rb")))
+    params = pickle.load(open(op.join(path, "params.p"), "rb"))
     contrasts = params['contrasts']
-    i_bests = find_best_design(eff, contrasts, n=1)
+    i_bests = find_best_design(eff, contrasts, n=3)
     print(i_bests)
     np.save(op.join(path, "bests"), i_bests)
 
-    i_moys = find_middle_design(eff, contrasts, n=1)
-    print(i_moys)
-    np.save(op.join(path, "moys"), i_moys)
+    i_stds = find_standards_design(eff, contrasts, n=3)
+    print(i_stds)
+    np.save(op.join(path, "standards"), i_stds)
