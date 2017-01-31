@@ -1,4 +1,4 @@
-from design_efficiency import write_parameters_file
+from create_parameters_file import write_parameters_file
 import numpy as np
 import scipy.io as io
 import sys

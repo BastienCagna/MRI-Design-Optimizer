@@ -117,7 +117,7 @@ def plot_distribs(params_file, efficiencies_file, design_index, fig_file=None):
         fig.savefig(fig_file)
 
 
-# TODO: add optional condtions grouping parameter
+# TODO: add optional conditions grouping parameter
 def plot_simple_design(ax, design, tr, durations, SOAmax):
     conditions = design[1]
     onsets = design[0]

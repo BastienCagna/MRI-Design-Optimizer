@@ -1,3 +1,32 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+    MRI Design Efficiency
+    =====================
+
+    This module is made to find more efficient design in a large number of possible designs.
+
+    Steps of this pipeline require that you previously created a parameters file using create_parameters_file.py
+
+    :Example
+    1 - Create the designs set:
+    $ python design_effeciency.py generate_designs /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/
+
+    2 - Compute corresponding efficiencies (for all designs and all contrasts):
+    $ python design_effeciency.py compute_efficiencies /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/
+
+    3 - Find the best designs (only one or several, here the 9 best):
+    $ python design_effeciency.py find_best_desings /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/ 9
+
+    4 - (optional) Find some 'average' designs (only one or several, here the 9 best):
+    $ python design_effeciency.py find_avg_desings /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/ 9
+
+    Todo:
+    * Generalise the process to any type of stimulation files. This version can be used only with .wav file for audio
+    stimulation.
+"""
+
 import numpy as np
 import os.path as op
 import pickle
@@ -7,8 +36,6 @@ from scipy import signal
 from nistats.design_matrix import make_design_matrix
 import warnings
 import pandas as pd
-import scipy.io as io
-import scipy.io.wavfile as wf
 
 
 class ConvergenceError(Exception):
@@ -19,30 +46,15 @@ class ConvergenceError(Exception):
         return repr(self.value)
 
 
-def create_soa_file():
-    data = io.loadmat("/hpc/banco/bastien.c/localizer.mat")
-    onsets = np.concatenate(data['onsets'].flatten()).flatten()
-    onsets = np.sort(onsets)
-    SOAs = onsets[1:] - onsets[:-1]
-
-    last_onset = onsets[-1]
-
-    nbr_soas = len(SOAs)
-    nbr_manquants = 144 - nbr_soas
-
-    start_at = np.mean(SOAs)
-
-    SOAs = np.insert(SOAs, 0, start_at)
-
-    np.save("/hpc/banco/bastien.c/data/optim/VL/banks/SOAs", SOAs)
-
-    # plt.hist(SOAs, 20)
-    # plt.title("Histogram of ISIs (or SOAs)")
-    # plt.xlabel("ISI (s)")
-    # plt.show()
-
-
 def design_matrix(tr, conditions, onsets, final_isi):
+    """Construct a design matrix using given parameter and nistat package.
+
+    :param tr: Repetition time (in seconds)
+    :param conditions: Vector giving condition of each stimulation of the scan as integer
+    :param onsets: Vector of onsets of all stimuli of the scan (in seconds)
+    :param final_isi: Last ISI (in seconds)
+    :return: The design matrix given by nistats
+    """
     # frame times
     total_duration = onsets[-1] + final_isi
     n_scans = np.ceil(total_duration/tr)
@@ -51,12 +63,18 @@ def design_matrix(tr, conditions, onsets, final_isi):
     # event-related design matrix
     paradigm = pd.DataFrame({'trial_type': conditions, 'onset': onsets})
 
-    X = make_design_matrix(frame_times, paradigm, drift_model='blank')
-
-    return X
+    x = make_design_matrix(frame_times, paradigm, drift_model='blank')
+    return x
 
 
 def efficiency(xmatrix, c):
+    """Compute the efficiency of a design. The formula is based of the works of Friston K & al. (1999).
+
+    :param xmatrix: Design matrix (created by nistats)
+    :param c: Contrast. Note that last coeffciencient of the contrast vector corresponds to the intercept and must be
+              set to 0.
+    :return: float efficiency value of the design using the given contrast.
+    """
     xcov = np.dot(xmatrix.T, xmatrix)
     ixcov = np.linalg.inv(xcov)
     e = 1 / np.dot( np.dot(c, ixcov) , c.T )
@@ -64,6 +82,13 @@ def efficiency(xmatrix, c):
 
 
 def find_in_tmp(tmp, needed):
+    """Search the needed row in the TMp array.
+    If the row is in the array, the row index is returned if not, -1 is returned.
+
+    :param tmp: Transition Matrix previous as defined by Hanson (2015). Past conditions of the design sequence.
+    :param needed: Needed past conditions vector.
+    :return: The row index of needed in tmp or -1.
+    """
     for i, item in enumerate(tmp):
         if np.sum(item == needed)==tmp.shape[1]:
             n_required = item.shape[0]
@@ -79,15 +104,20 @@ def find_in_tmp(tmp, needed):
 
 
 def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_max=1000, verbose=False):
-    """
-    Generate nbr_seq sequences of events.
-    :param count_by_cond:
-    :param groups:
-    :param nbr_designs:
-    :param tmp: Np * Nh matrix describing all possible sequence composed of Nh events.
-    :param tmn: Np * Nj matrix giving probabilities of new event type depending of the previous sequence.
-    :param iter_max:
-    :return:
+    """Generate nbr_seq different sequences of events.
+
+    Each sequence is composed of conditions indexes following the given count for
+    each condition. Those conditions can be grouped and tmp and tmn give the probability to get next group in function
+    of which groups have alreeady been drawed. See Design Efficiency, Hanson RN, Elsevier, 2015 for more explainations.
+
+    :param count_by_cond_orig: Number of event for each condition.
+    :param groups: Give the group index if each condition.
+    :param nbr_designs: Number of needed designs.
+    :param tmp: Np * Nh matrix describing all possible sequence composed of Nh events (Hanson, 2015).
+    :param tmn: Np * Nj matrix giving probabilities of new event type depending of the previous sequence (Hanson, 2015).
+    :param iter_max: (optional) Maximal number of trial of the different drawing loops of the algorithm. Default: 1000.
+    :param verbose:  (optional) Set to True to get more printed details of the running. Default: False.
+    :return: An array of conditions sequences. Each row corresponds to a design.
     """
     # Nbr of conditions
     Nj = len(count_by_cond_orig)
@@ -218,70 +248,16 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
     return seqs
 
 
-# TODO: Completer la doc
-def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrast_names, files_list, files_path,
-                          ITI_file, nbr_designs, tmp, tmn, tr, output_path, output_file="params.p"):
-    """
-    Create the design configuration file containning parameters that's will be used by the pipeline.
+def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, verbose=False):
+    """Create random designs that follow the configuration paramaters (nbr of designs, transition matrix, tr ...etc).
 
-    :param output_file:
-    :param conditions_names:
-    :param cond_of_files:
-    :param groups:
-    :param contrasts:
-    :param contrast_names:
-    :param files_list:
-    :param files_path:
-    :param ITI_file:
-    :param nbr_designs:
-    :param tmp:
-    :param tmn:
-    :param tr:
-    :param output_path:
+    :param params_path: Path of the directory that contains the parameters file (by default output directory).
+    :param params_file: (optional) Parameters file name. Default: params.p
+    :param designs_file: (optional) Designs file name in the output directory. Default: designs.p
+    :param start_at: (optional) Time before the first onset (in seconds). Default: 2.0 seconds.
+    :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
     :return:
     """
-    # TODO: amelioration: ajouter plus de controls
-
-    # Count for each condition, how many times she's appearing
-    cond_of_files = np.array(cond_of_files)
-    ucond = np.unique(cond_of_files)
-    nbr_cond = len(ucond)
-    count_by_cond = np.zeros((nbr_cond,))
-    for cond in ucond:
-        count_by_cond[cond] = np.sum(cond_of_files==cond)
-
-    # Durations
-    durations = []
-    for file in files_list:
-        fs, x = wf.read(op.join(files_path, file))
-        durations.append(len(x)/float(fs))
-    durations = np.array(durations)
-
-    # Save conditions and onsets
-    params = {
-        'cond_names': conditions_names,
-        'cond_counts': count_by_cond,
-        'cond_of_files': cond_of_files,
-        'cond_groups': groups,
-        'contrasts': contrasts,
-        'constrast_names': contrast_names,
-        'files_duration': durations,
-        'files_list': files_list,
-        'files_path': files_path,
-        'ITI_file': ITI_file,
-        'nbr_designs': nbr_designs,
-        'TMp': tmp,
-        'TMn': tmn,
-        'tr': tr,
-        'output_path': output_path
-    }
-    pickle.dump(params, open(op.join(output_path, output_file), "wb"))
-
-    return True
-
-
-def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, postStimTime=0,
-                     verbose=False):
     params = pickle.load(open(op.join(params_path, params_file), "rb"))
     nbr_seqs = params['nbr_designs']
     cond_counts = params['cond_counts']
@@ -349,10 +325,24 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
     return
 
 
-def compute_efficiencies(param_path, params_file="params.p", designs_file="designs.p", output_file="efficiencies.npy",
-                         nf=9, verbose=False):
+def compute_efficiencies(params_path, params_file="params.p", designs_file="designs.p", output_file="efficiencies.npy",
+                         nf=9, fc1=1/120, verbose=False):
+    """Compute efficiencies of each designs and each contrasts.
+
+    Each regressor of the design matrix (each one corresponding to a condition) is filtered by a butterwotrh filter and
+    then the efficiency of the resulting matrix is computed.
+
+    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
+    :param params_file: (optional) Parameters file name: Default: params.p
+    :param designs_file: (optional) Designs file name: Default: designs.p
+    :param output_file: (optional) Efficiencies file name. Default: efficiencies.npy.
+    :param nf: (optional) Order of the butterworth filter. Default: 9.
+    :param fc1: (optional) High pass cutting frequency of the filter (in Hertz). Default: 1/120 Hz.
+    :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
+    :return:
+    """
     # Read parameters
-    params = pickle.load(open(op.join(param_path, params_file), "rb"))
+    params = pickle.load(open(op.join(params_path, params_file), "rb"))
     output_path = params['output_path']
     tr = params['tr']
     nbr_tests = params['nbr_designs']
@@ -371,7 +361,6 @@ def compute_efficiencies(param_path, params_file="params.p", designs_file="desig
 
     # Unvariants filter parameters
     fs = 1 / tr
-    fc1 = 1 / 120
     w1 = 2 * fc1 / fs
 
     t = time.time()
@@ -405,33 +394,115 @@ def compute_efficiencies(param_path, params_file="params.p", designs_file="desig
     return
 
 
+def find_best_designs(params_path, params_file="params.p", efficiencies_file="efficiencies.npy",
+                      output_file="bests.npy", n=1):
+    """Return one or several index(es) of designs that provide jointly best efficiencies for all contrasts.
+
+    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
+    :param params_file: (optional) Parameters file name: Default: params.p
+    :param efficiencies_file: (optional) Efficiencies file name. Default: efficiencies.npy
+    :param n: (optional) Number of indexes to return. Default: 1.
+    :type n: int
+    :return: Nothing.
+    """
+    # Load data
+    params = pickle.load(open(op.join(params_path, params_file), "rb"))
+    contrasts = params['contrasts']
+    efficiencies = np.load(op.join(params['output_path'], efficiencies_file))
+
+    nbr_tests = efficiencies.shape[1]
+    nbr_contrasts = contrasts.shape[0]
+
+    # Distribution for each contrast
+    eff_rep = np.zeros(efficiencies.shape)
+    for c in range(nbr_contrasts):
+        for i in range(eff_rep.shape[1]):
+            eff_rep[c, i] = np.sum(efficiencies[c, :] < efficiencies[c, i])
+    eff_rep = eff_rep / nbr_tests
+
+    # Threshold the distribution and count intersections
+    th_v = np.arange(1.0, 0., step=-0.01)
+    nbr_good_tests = np.zeros(th_v.shape)
+    i_best = -1
+    for (i, th) in enumerate(th_v):
+        bin_eff_rep = eff_rep >= th
+        intersection = np.sum(bin_eff_rep, axis=0) == nbr_contrasts
+        nbr_good_tests[i] = np.sum(intersection)
+        if nbr_good_tests[i] >= n:
+            # take the last to maximise the efficiency of the first contrast
+            i_best = np.argwhere(intersection)[-n:].flatten()
+            break
+
+    np.save(op.join(params['output_path'], output_file), i_best)
+    return
+
+
+def find_avg_designs(params_path, params_file="params.p", efficiencies_file="efficiencies.npy", output_file="avgs.npy",
+                     n=1, verbose=False):
+    """Return one or several index(es) of designs close to the average efficiency for all contrasts.
+
+    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
+    :param params_file: (optional) Parameters file name: Default: params.p
+    :param efficiencies_file: (optional) Efficiencies file name. Default: efficiencies.npy
+    :param n: (optional) Number of indexes to return. Default: 1.
+    :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
+    :type n: int
+    :return: Nothing.
+    """
+    # Load data
+    params = pickle.load(open(op.join(params_path, params_file), "rb"))
+    contrasts = params['contrasts']
+    efficiencies = np.load(op.join(params['output_path'], efficiencies_file))
+
+    nbr_tests = efficiencies.shape[1]
+    nbr_contrasts = contrasts.shape[0]
+
+    # Distribution for each contrast
+    eff_rep = np.zeros(efficiencies.shape)
+    for c in range(nbr_contrasts):
+        for i in range(eff_rep.shape[1]):
+            eff_rep[c, i] = np.sum(efficiencies[c, :] < efficiencies[c, i])
+    eff_rep = eff_rep / nbr_tests
+
+    # Threshold the distribution and count intersections
+    th_h_v = np.arange(0.51, 1.00, step=+0.01)
+    th_l_v = np.arange(0.49, 0., step=-0.01)
+    nbr_good_tests = np.zeros(th_h_v.shape)
+    i_best = -1
+    for (i, th_h) in enumerate(th_h_v):
+        th_l = th_l_v[i]
+        bin_eff_rep = (eff_rep >= th_l) * (eff_rep <= th_h)
+        intersection = np.sum(bin_eff_rep, axis=0) == nbr_contrasts
+        nbr_good_tests[i] = np.sum(intersection)
+        if nbr_good_tests[i] >= n:
+            if verbose:
+                print("Low threshold: {}\nHight threshold: {}".format(th_l, th_h))
+            # take the last to maximise the efficiency of the first contrast
+            i_best = np.argwhere(intersection)[-n:].flatten()
+            break
+
+    np.save(op.join(params['output_path'], output_file), i_best)
+    return
+
+
 if __name__ == "__main__":
+    """
+        All steps of the pipeline can be directly runned separatly by command line.
+    """
+
     function = sys.argv[1]
 
-    # if function == "randomized_onsets":
-    #     """ example: python /hpc/banco/bastien.c/python/designer/design_efficiency.py randomized_onsets
-    #     /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/params.p
-    #     /hpc/banco/bastien.c/data/optim/VL/banks/no_constraint/designs.npy """
-    #     randomized_onsets(sys.argv[2], sys.argv[3])
-    #
-    # elif function == "randomized_SOA_order":
-    #     randomized_soa_order(sys.argv[2], sys.argv[3], sys.argv[4])
-    #
-    # elif function == "randomized_ISI_order":
-    #     if len(sys.argv) == 6:
-    #         randomized_isi_order(sys.argv[2], sys.argv[3], sys.argv[4], float(sys.argv[5]))
-    #     else:
-    #         randomized_isi_order(sys.argv[2], sys.argv[3], sys.argv[4], float(sys.argv[5]),
-    #                              postStimTime=float(sys.argv[6]))
-    # elif function == "voice_calib_order":
-    #         voice_calib_order(sys.argv[2], sys.argv[3], float(sys.argv[4]), float(sys.argv[5]))
-    # elif function == "voice_calib_order2":
-    #         voice_calib_order2(sys.argv[2], sys.argv[3], float(sys.argv[4]), float(sys.argv[5]))
     if function == "generate_designs":
         generate_designs(sys.argv[2], verbose=True)
 
     elif function == 'compute_efficiencies':
         compute_efficiencies(sys.argv[2], verbose=True)
+
+    elif function == "find_best_designs":
+        find_best_designs(sys.argv[2], n=int(sys.argv[3]))
+
+    elif function == "find_avg_designs":
+        find_avg_designs(sys.argv[2], n=int(sys.argv[3]))
 
     else:
         warnings.warn("Unrecognized function '{}'".format(function))
