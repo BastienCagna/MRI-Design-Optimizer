@@ -1,3 +1,7 @@
+# Because otherwise "$DISPLAY" is not defined in batch mode
+import matplotlib
+matplotlib.use('Agg')
+
 import numpy as np
 import pickle
 import pandas as pd
@@ -190,12 +194,12 @@ if __name__ == "__main__":
         plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
                       op.join(path, "distribs_bests/{:05d}.png".format(index)))
 
-    best_indexes = np.load(op.join(path, "standards.npy"))
-    plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_standards.png"))
+    best_indexes = np.load(op.join(path, "avgs.npy"))
+    plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_avgs.png"))
 
-    if not op.isdir(op.join(path, "distribs_stds")):
-        system("mkdir {}".format(op.join(path, "distribs_stds")))
+    if not op.isdir(op.join(path, "distribs_avgs")):
+        system("mkdir {}".format(op.join(path, "distribs_avgs")))
     for index in best_indexes:
         plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
-                      op.join(path, "distribs_stds/{:05d}.png".format(index)))
+                      op.join(path, "distribs_avgs/{:05d}.png".format(index)))
 

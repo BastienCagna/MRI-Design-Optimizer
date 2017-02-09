@@ -12,8 +12,10 @@ import pickle
 import os.path as op
 
 
-def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrast_names, files_list, files_path,
-                          iti_file, nbr_designs, tmp, tmn, tr, output_path, output_file="params.p", verbose=False):
+# TODO: add pages number of the Hanson article in comments
+def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrast_names, files_duration,
+                          files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path,
+                          output_file="params.p", verbose=False):
     """
     Create the design configuration file containning parameters that's will be used by the pipeline.
 
@@ -24,17 +26,20 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
     :param contrasts: List of contrasts. Each row of the array is a contrast. Last coeffcient of each row corresponds to
                       the intercept.
     :param contrast_names: Name of each contrasts (for final figures).
+    :param files_duration: Duration of each file (in seconds).
     :param files_list: List of .wav stimuli files.
-    :param files_path: Path to .wav stimuli files.
     :param iti_file: Path to a numpy file that contains all used ITI in a single vector.
     :param nbr_designs: Number of designs to generate.
-    :param tmp: Transition Matrix (previous) as defined by Hanson, 2015.
-    :param tmn: Transition Matrix (next) as defined by Hanson, 2015.
-    :param tr: Repetition tme (in seconds).
+    :param tmp: Transition Matrix (previous) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
+    :param tmn: Transition Matrix (next) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
+    :param tr: Repetition time (in seconds).
     :param output_path: (optional) Parameters file name. Default: params.p
     :param verbose: (optional) Print all parameters. Default: False.
-    :return: Nothing. The paramter file is saved in the output_path.
+    :return: Nothing. The parameters file is saved in the output_path.
     """
+    tmp = np.array(tmp)
+    tmn = np.array(tmn)
+    contrasts = np.array(contrasts)
 
     # Count for each condition, how many times she's appearing
     cond_of_files = np.array(cond_of_files)
@@ -44,13 +49,6 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
     for cond in ucond:
         count_by_cond[cond] = np.sum(cond_of_files==cond)
 
-    # Durations
-    durations = []
-    for file in files_list:
-        fs, x = wf.read(op.join(files_path, file))
-        durations.append(len(x)/float(fs))
-    durations = np.array(durations)
-
     # Save conditions and onsets
     params = {
         'cond_names': conditions_names,
@@ -59,9 +57,8 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
         'cond_groups': groups,
         'contrasts': contrasts,
         'constrast_names': contrast_names,
-        'files_duration': durations,
+        'files_duration': files_duration,
         'files_list': files_list,
-        'files_path': files_path,
         'ITI_file': iti_file,
         'nbr_designs': nbr_designs,
         'TMp': tmp,

@@ -1,8 +1,12 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from create_parameters_file import write_parameters_file
 import numpy as np
 import scipy.io as io
-import sys
+import os.path as op
 import pandas as pd
+
 
 # output_path = "/hpc/banco/bastien.c/data/optim/VL/banks/a100/params.p"
 # tr = 0.975
@@ -81,26 +85,41 @@ import pandas as pd
 
 
 # IDENTIFCATION TASK -------
-contrasts = np.array([
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-    [-1, 1, 1, -1, -1, -1, 1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 0]
-])
-contrasts_names = ["Speaker 1 vs. Speaker 2",
-                   "Speaker 2 vs. Speaker 3",
-                   "Speaker 1 vs. Speaker 3",
-                   "Low F0 vs. High F0"]
 
-#  Transitions Constraints
+# IDENTIFICATION TASK
+# The identification task is composed of 12 different words pronounced by 3 speakers. Each speaker pronounces the
+# same 12 words. Thus, there is 36 waves files (3x12). Each file duration is different.
+#
+# The design allows to have two consecutive time the same speaker but never two times the same word.
+#
+
+# First: Read the stimuli database infos and set some paradigm variables
+stim_db = pd.read_csv("/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/stim_db.csv")
+files_list = stim_db['File']
+durations = stim_db['Duration']
+conditions_names = ['Condition']
+
+count_by_cond = np.ones((36,))
+cond_of_files = np.arange(36)
+iti_file = "/hpc/banco/bastien.c/data/optim/identification/ITIs.npy"
+output_path = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/"
+tr = 0.955
+nbr_designs = 500
+
+
+# Secondary, define tansitions table
+
+# Conditions are not grouped, so groups is a vector starting from 1 to 36
 groups = np.arange(1, 37)
 
+# Number of speakers
 Nspeak = 3
+# Number of different words (each speaker pronounces the same words)
 Nwords = 12
-
+# Total number of words (or conditions)
 K = Nwords * Nspeak
-p = 1 / ((Nspeak - 1)*(Nwords - 1))
 
+# TMp matrix contains all possible couple of condition excepted two time the same word (regardless of the speaker)
 tmp = []
 for w1 in range(1, K+1):
     k = 0
@@ -113,6 +132,8 @@ for w1 in range(1, K+1):
             k += 1
 tmp = np.array(tmp)
 
+# For each allowed couple of words, set probabilities to access any words according to the constraint (never two
+# times the same word and never more than two times the same speaker)
 speakers = np.repeat(np.arange(1, Nspeak+1), Nwords)
 tmn = np.ones((K*(K-Nspeak), K))
 for i, past in enumerate(tmp):
@@ -130,28 +151,29 @@ for i, past in enumerate(tmp):
             tmn[i, w3-1] = 0
 sums = np.sum(tmn, axis=1)
 
+# For each rows, allowed transition are currently set to 1. Now, set value in probalities. Each allowed transitions
+# are equiprobable.
 for i in range(tmn.shape[0]):
     p = 1 / sums[i]
     for j in range(tmn.shape[1]):
         tmn[i, j] *= p
 
-sound_list = io.loadmat("/hpc/banco/InterTVA/Sounds/Identification_task/List_identification.mat")
-files_path = "/hpc/banco/InterTVA/Sounds/Identification_task/"
-conditions_names = sound_list['List_identification'][:, 0]
-durations = sound_list['List_identification'][:, 2] / 1000.0
-files_list = []
-for file in sound_list['List_identification'][:, 0]:
-    files_list.append(file[0] + ".wav")
-count_by_cond = np.ones((36,))
-cond_of_files = np.arange(36)
 
-iti_file = "/hpc/banco/bastien.c/data/optim/identification/ITIs.npy"
-output_path = "/hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/"
-tr = 0.955
-nbr_designs = 10
+# Finally, define the interresting contrasts
+contrasts = np.array([
+    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+    [-1, 1, 1, -1, -1, -1, 1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 0]
+])
+contrasts_names = ["Speaker 1 vs. Speaker 2",
+                   "Speaker 2 vs. Speaker 3",
+                   "Speaker 1 vs. Speaker 3",
+                   "Low F0 vs. High F0"]
 
-write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrasts_names, files_list,
-                      files_path, iti_file, nbr_designs, tmp, tmn, tr, output_path)
+
+write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrasts_names, durations, files_list,
+                      iti_file, nbr_designs, tmp, tmn, tr, output_path, verbose=True)
 #  CALIBRATION TASK
 # contrasts = np.array([
 #     [-1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 0], # Young / old

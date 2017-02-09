@@ -17,8 +17,6 @@ stimulation study is currently in progress.
 
 ### Todo
 * Validate the pipeline;
-* Generalise to any stimuli format (yet, only .wav stimulation is
-supported);
 
 ## The pipeline
 The process is divided in five different parts:
@@ -31,3 +29,9 @@ The process is divided in five different parts:
 
 The package provides also some viewing functions. You can, for example
 see the efficiencies distribution over all the designs for each contrast.
+
+## Design's parameters
+(comming soon...)
+
+## Example
+(comming soon...)
