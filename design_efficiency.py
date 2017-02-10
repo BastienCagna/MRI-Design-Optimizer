@@ -43,7 +43,7 @@ class ConvergenceError(Exception):
         return repr(self.value)
 
 
-def design_matrix(tr, conditions, onsets, final_isi):
+def design_matrix(design, tr, final_isi):
     """Construct a design matrix using given parameter and nistat package.
 
     :param tr: Repetition time (in seconds)
@@ -53,14 +53,16 @@ def design_matrix(tr, conditions, onsets, final_isi):
     :return: The design matrix given by nistats
     """
     # frame times
-    total_duration = onsets[-1] + final_isi
+    total_duration = design['onsets'][-1] + design['duration'][-1]
     n_scans = np.ceil(total_duration/tr)
     frame_times = np.arange(n_scans) * tr
 
     # event-related design matrix
-    paradigm = pd.DataFrame({'trial_type': conditions, 'onset': onsets})
+    # paradigm = pd.DataFrame({'trial_type': conditions, 'onset': onsets})
 
-    x = make_design_matrix(frame_times, paradigm, drift_model='blank')
+    # TODO: check what does the duration vector on the design matrix (does make change with with single event ? =
+    # short block)
+    x = make_design_matrix(frame_times, design, drift_model='blank')
     return x
 
 
@@ -245,30 +247,22 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
     return seqs
 
 
-def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, verbose=False):
+# def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, verbose=False):
+def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files, cond_names, cond_groups, tmp, tmn,
+                     iti_filename, start_at=2.0, verbose=False):
     """Create random designs that follow the configuration paramaters (nbr of designs, transition matrix, tr ...etc).
 
-    :param params_path: Path of the directory that contains the parameters file (by default output directory).
-    :param params_file: (optional) Parameters file name. Default: params.p
-    :param designs_file: (optional) Designs file name in the output directory. Default: designs.p
     :param start_at: (optional) Time before the first onset (in seconds). Default: 2.0 seconds.
     :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
-    :return:
+    :return: a array of pandas' dataframe containing all the designs.
     """
-    params = pickle.load(open(op.join(params_path, params_file), "rb"))
-    nbr_seqs = params['nbr_designs']
-    cond_counts = params['cond_counts']
-    filenames = params['files_list']
-    durations = params['files_duration']
-    cond_of_files = params['cond_of_files']
 
     nbr_events = int(np.sum(cond_counts))
 
     # Get condtions order of all desgins
     if verbose:
         print('Generate conditions orders')
-    conds = generate_sequence(cond_counts, params['cond_groups'], nbr_seqs, params['TMp'], params['TMn'],
-                              verbose=verbose)
+    conds = generate_sequence(cond_counts, cond_groups, nbr_seqs, tmp, tmn, verbose=verbose)
 
     # Get file order of each designs and so get duration order also (will be used to generate design matrix)
     if verbose:
@@ -282,7 +276,7 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
         durations_row = []
         file_order = []
         for cond in seq:
-            i_files = np.where((used_files==0) * (cond_of_files==cond))[0]
+            i_files = np.where((used_files == 0) * (cond_of_files == cond))[0]
             i_file = np.random.choice(i_files)
             file_order.append(filenames[i_file])
             used_files[i_file] = 1
@@ -291,13 +285,10 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
         durations_tab.append(durations_row)
         files_orders.append(file_order)
 
-    # np.save(op.join(output_path, "file_orders"), files_orders)
-    # np.save(op.join(output_path, "durations_tab"), durations_tab)
-
     # Create a new onset vector by drawing new event independently of the condition index
     if verbose:
         print("Generating ITI orders")
-    iti_orig = np.load(params['ITI_file'])
+    iti_orig = np.load(iti_filename)
     onsets = np.zeros((nbr_seqs, nbr_events))
     isi_maxs = np.zeros((nbr_seqs,))
     for i in range(nbr_seqs):
@@ -312,45 +303,38 @@ def generate_designs(params_path, params_file="params.p", designs_file="designs.
         isi_v = onsets[i, 1:] - onsets[i, :-1]
         isi_maxs[i] = np.max(isi_v)
 
-    # Save designs
-    designs = {"onsets": onsets, "conditions": conds, "files": files_orders, "durations": durations_tab,
-               'max_ISIs': isi_maxs}
-    pickle.dump(designs, open(op.join(params['output_path'], designs_file), "wb"))
-    if verbose:
-        print("Designs have been saved to: " + op.join(params['output_path'], designs_file))
+    # Set the paradigm as nistat does in a pandas' DataFrame
+    designs = []
+    for i in range(nbr_seqs):
+        trial_types = np.array([cond_names[j] for j in conds[i]])
+        design = {"onset": onsets[i], "trial_type": trial_types, "files": files_orders[i],
+                  "duration": durations_tab[i]}
+        designs.append(design)
+    # pickle.dump(designs, open(op.join(params['output_path'], designs_file), "wb"))
+    # if verbose:
+    #     print("Designs have been saved to: " + op.join(params['output_path'], designs_file))
     # np.save(designs_file, [onsets, conds, files_orders, durations_tab])
-    return
+    return designs, isi_maxs
 
 
-def compute_efficiencies(params_path, params_file="params.p", designs_file="designs.p", output_file="efficiencies.npy",
-                         nf=9, fc1=1/120, verbose=False):
+def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=9, fc1=1/120, verbose=False):
     """Compute efficiencies of each designs and each contrasts.
 
     Each regressor of the design matrix (each one corresponding to a condition) is filtered by a butterwotrh filter and
     then the efficiency of the resulting matrix is computed.
 
-    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
-    :param params_file: (optional) Parameters file name: Default: params.p
-    :param designs_file: (optional) Designs file name: Default: designs.p
-    :param output_file: (optional) Efficiencies file name. Default: efficiencies.npy.
     :param nf: (optional) Order of the butterworth filter. Default: 9.
     :param fc1: (optional) High pass cutting frequency of the filter (in Hertz). Default: 1/120 Hz.
     :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
     :return:
     """
-    # Read parameters
-    params = pickle.load(open(op.join(params_path, params_file), "rb"))
-    output_path = params['output_path']
-    tr = params['tr']
-    nbr_tests = params['nbr_designs']
-    contrasts = params['contrasts']
+    nbr_tests = len(designs)
 
-    # Read designs
-    designs = pickle.load(open(op.join(output_path, designs_file), "rb"))
-    onsets = designs['onsets']
-    conditions = np.array(designs['conditions'], dtype=int)
-    durations_tab = designs['durations']
-    isi_maxs = designs['max_ISIs']
+    # # Read designs
+    # onsets = designs['onsets']
+    # conditions = np.array(designs['conditions'], dtype=int)
+    # durations_tab = designs['durations']
+    # isi_maxs = designs['max_ISIs']
 
     nbr_contrasts = contrasts.shape[0]
 
@@ -362,7 +346,7 @@ def compute_efficiencies(params_path, params_file="params.p", designs_file="desi
 
     t = time.time()
     for (i, c) in enumerate(contrasts):
-        for k in range(nbr_tests):
+        for k, design in enumerate(designs):
             # Construct the proper filte
             fc2 = 1 / isi_maxs[k]
             w2 = 2 * fc2 / fs
@@ -376,7 +360,7 @@ def compute_efficiencies(params_path, params_file="params.p", designs_file="desi
                 print("%ds: contrast %d/%d - efficiency evaluation %d/%d" %
                       (time.time() - t, i + 1, nbr_contrasts, k + 1, nbr_tests))
 
-            X = design_matrix(tr, conditions[k], onsets[k], final_isi=durations_tab[k][-1])
+            X = design_matrix(tr, design)
 
             # Filter each columns to compute efficiency only on the bold signal bandwidth
             for j in range(X.shape[1] - 1):
@@ -386,18 +370,18 @@ def compute_efficiencies(params_path, params_file="params.p", designs_file="desi
             # Compute efficiency of this design for this contrast
             efficiencies[i, k] = efficiency(X, c)
 
-    np.save(op.join(output_path, output_file), efficiencies)
-    if verbose:
-        print("Efficiencies saved at: " + op.join(output_path, output_file))
-    return
+    return efficiencies
 
 
 if __name__ == "__main__":
     function = sys.argv[1]
 
     if function == "generate_designs":
-        generate_designs(sys.argv[2], verbose=True)
-
+        params = pickle.load(open(sys.argv[2], "rb"))
+        designs, isi_maxs = generate_designs(params['nbr_designs'], params['cond_counts'], params['files_list'],
+                                   params['files_duration'], params['cond_of_files'], params['cond_groups'],
+                                   params['TMp'], params['TMn'], verbose=True)
+        np.save(sys.argv[3], designs)
     elif function == 'compute_efficiencies':
         compute_efficiencies(sys.argv[2], verbose=True)
 

@@ -32,35 +32,51 @@ from selection import find_best_designs, find_avg_designs
 from viewer import plot_n_matrix, plot_distribs
 
 
-def optimisation_process(params_path, n_sel):
-    generate_designs(params_path, verbose=True)
+def optimisation_process(params_path, work_dir, n_sel):
+    params = pickle.load(open(op.join(params_path, "params.pck"), "rb"))
+    nbr_designs = params['nbr_designs']
+    cond_counts = params['cond_counts']
+    files_list = params['files_list']
+    files_duration = params['files_duration']
+    cond_of_files = params['cond_of_files']
+    cond_groups = params['cond_groups']
+    tmp = params['TMp']
+    tmn = params['TMn']
+    tr = params['TR']
+    contrasts = params['contrasts']
 
-    compute_efficiencies(params_path, verbose=True)
+    designs, isi_maxs = generate_designs(nbr_designs, cond_counts, files_list, files_duration, cond_of_files,
+                                        cond_groups, tmp, tmn, verbose=True)
 
-    find_best_designs(params_path, n=n_sel)
+    efficiencies = compute_efficiencies(tr, designs, contrasts, isi_maxs, verbose=True)
 
-    find_avg_designs(params_path, n=n_sel, verbose=True)
+    best_idx = find_best_designs(efficiencies, contrasts, n=n_sel)
 
-    params = pickle.load(open(op.join(params_path, "params.p"), "rb"))
-    path = params['output_path']
+    avg_idx = find_avg_designs(efficiencies, contrasts, n=n_sel, verbose=True)
 
-    best_indexes = np.load(op.join(path, "bests.npy"))
-    plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_bests.png"))
+    plot_n_matrix(best_idx, designs, fig_file=op.join(work_dir, "desgins_matrix_bests.png"))
+    # viewer.plot_matrixes(best_idx, designs, tr)
 
-    if not op.isdir(op.join(path, "distribs_bests")):
-        system("mkdir {}".format(op.join(path, "distribs_bests")))
-    for index in best_indexes:
-        plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
-                      op.join(path, "distribs_bests/{:05d}.png".format(index)))
+    for idx in best_idx:
+        viewer.plot_distrib(designs[idx], idx)
 
-    avgs_indexes = np.load(op.join(path, "avgs.npy"))
-    plot_n_matrix(avgs_indexes, path, fig_file=op.join(path, "desgins_matrix_avgs.png"))
-
-    if not op.isdir(op.join(path, "distribs_avgs")):
-        system("mkdir {}".format(op.join(path, "distribs_avgs")))
-    for index in avgs_indexes:
-        plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
-                      op.join(path, "distribs_avgs/{:05d}.png".format(index)))
+    # best_indexes = np.load(op.join(path, "bests.npy"))
+    # plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_bests.png"))
+    #
+    # if not op.isdir(op.join(path, "distribs_bests")):
+    #     system("mkdir {}".format(op.join(path, "distribs_bests")))
+    # for index in best_indexes:
+    #     plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
+    #                   op.join(path, "distribs_bests/{:05d}.png".format(index)))
+    #
+    # avgs_indexes = np.load(op.join(path, "avgs.npy"))
+    # plot_n_matrix(avgs_indexes, path, fig_file=op.join(path, "desgins_matrix_avgs.png"))
+    #
+    # if not op.isdir(op.join(path, "distribs_avgs")):
+    #     system("mkdir {}".format(op.join(path, "distribs_avgs")))
+    # for index in avgs_indexes:
+    #     plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
+    #                   op.join(path, "distribs_avgs/{:05d}.png".format(index)))
     return
 
 

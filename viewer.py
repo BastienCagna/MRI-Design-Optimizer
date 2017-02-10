@@ -88,7 +88,7 @@ def plot_box(result_files, legends, fig_file=None):
         fig.savefig(fig_file)
 
 
-def plot_distribs(params_file, efficiencies_file, design_index, fig_file=None):
+def plot_distribs(design, efficiencies, fig_file=None):
     params = pickle.load(open(params_file, 'rb'))
     contrasts = params['contrasts']
 
@@ -141,30 +141,18 @@ def plot_simple_design(ax, design, tr, durations, SOAmax):
     X = make_design_matrix(frame_times, paradigm, drift_model='blank')
 
 
-def plot_n_matrix(designs_indexes, params_path, params_file="params.p", designs_file="designs.p",
-                  efficiencies_file="efficiencies.npy", fig_file=None):
-    # Loads data and design's parameters
-    print(op.join(params_path, params_file))
-    params = pickle.load(open(op.join(params_path, params_file), "rb"))
-    tr = params['tr']
-    # contrasts = params['contrasts']
-    output_path = params['output_path']
-
-    designs = pickle.load(open(op.join(output_path, designs_file), "rb"))
-    # durations_tab = designs['durations']
-    # efficiencies = np.load(op.join(output_path, efficiencies_file))
-
+def plot_n_matrix(designs_indexes, designs, tr, fig_file=None):
     # Plot nbr_matrix first designs matrixes
     fig = plt.figure(figsize=(21, 13))
+
     n_rows = int(np.ceil(np.sqrt(len(designs_indexes))))
     n_cols = int(np.ceil(len(designs_indexes)/float(n_rows)))
-    for i, index in enumerate(designs_indexes):
+
+    for i, idx in enumerate(designs_indexes):
         ax = plt.subplot(n_rows, n_cols, i+1)
-        X = design_matrix(tr, designs['conditions'][index], designs['onsets'][index], designs['durations'][index][0])
-        plot_design_matrix(X, ax=ax)
-        plt.title("{} - design n°{}".format(i+1, index))
-        # for j, c in enumerate(contrasts):
-        #     plt.text(5.6, 100 + j*50, "{:.5f}".format(efficiencies[j, index]), color='m', size=12)
+        x = design_matrix(tr, designs[idx])
+        plot_design_matrix(x, ax=ax)
+        plt.title("{} - design n°{}".format(i+1, idx))
 
     if fig_file is not None:
         fig.savefig(fig_file)
