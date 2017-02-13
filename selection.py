@@ -26,21 +26,13 @@ import warnings
 import os.path as op
 
 
-def find_best_designs(params_path, params_file="params.p", efficiencies_file="efficiencies.npy",
-                      output_file="bests.npy", n=1):
+def find_best_designs(efficiencies, contrasts, n=1):
     """Return one or several index(es) of designs that provide jointly best efficiencies for all contrasts.
 
-    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
-    :param params_file: (optional) Parameters file name: Default: params.p
-    :param efficiencies_file: (optional) Efficiencies file name. Default: efficiencies.npy
     :param n: (optional) Number of indexes to return. Default: 1.
     :type n: int
     :return: Nothing.
     """
-    # Load data
-    params = pickle.load(open(op.join(params_path, params_file), "rb"))
-    contrasts = params['contrasts']
-    efficiencies = np.load(op.join(params['output_path'], efficiencies_file))
 
     nbr_tests = efficiencies.shape[1]
     nbr_contrasts = contrasts.shape[0]
@@ -65,27 +57,17 @@ def find_best_designs(params_path, params_file="params.p", efficiencies_file="ef
             i_best = np.argwhere(intersection)[-n:].flatten()
             break
 
-    np.save(op.join(params['output_path'], output_file), i_best)
-    return
+    return i_best
 
 
-def find_avg_designs(params_path, params_file="params.p", efficiencies_file="efficiencies.npy", output_file="avgs.npy",
-                     n=1, verbose=False):
+def find_avg_designs(efficiencies, contrasts, n=1, verbose=False):
     """Return one or several index(es) of designs close to the average efficiency for all contrasts.
 
-    :param params_path: Path of the directory that contains the parameters file (by default, this is the output dir.).
-    :param params_file: (optional) Parameters file name: Default: params.p
-    :param efficiencies_file: (optional) Efficiencies file name. Default: efficiencies.npy
     :param n: (optional) Number of indexes to return. Default: 1.
     :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
     :type n: int
     :return: Nothing.
     """
-    # Load data
-    params = pickle.load(open(op.join(params_path, params_file), "rb"))
-    contrasts = params['contrasts']
-    efficiencies = np.load(op.join(params['output_path'], efficiencies_file))
-
     nbr_tests = efficiencies.shape[1]
     nbr_contrasts = contrasts.shape[0]
 
@@ -100,7 +82,7 @@ def find_avg_designs(params_path, params_file="params.p", efficiencies_file="eff
     th_h_v = np.arange(0.51, 1.00, step=+0.01)
     th_l_v = np.arange(0.49, 0., step=-0.01)
     nbr_good_tests = np.zeros(th_h_v.shape)
-    i_best = -1
+    i_avg = -1
     for (i, th_h) in enumerate(th_h_v):
         th_l = th_l_v[i]
         bin_eff_rep = (eff_rep >= th_l) * (eff_rep <= th_h)
@@ -110,11 +92,10 @@ def find_avg_designs(params_path, params_file="params.p", efficiencies_file="eff
             if verbose:
                 print("Low threshold: {}\nHight threshold: {}".format(th_l, th_h))
             # take the last to maximise the efficiency of the first contrast
-            i_best = np.argwhere(intersection)[-n:].flatten()
+            i_avg = np.argwhere(intersection)[-n:].flatten()
             break
 
-    np.save(op.join(params['output_path'], output_file), i_best)
-    return
+    return i_avg
 
 
 if __name__ == "__main__":

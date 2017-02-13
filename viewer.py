@@ -88,20 +88,16 @@ def plot_box(result_files, legends, fig_file=None):
         fig.savefig(fig_file)
 
 
-def plot_distribs(design, efficiencies, fig_file=None):
-    params = pickle.load(open(params_file, 'rb'))
-    contrasts = params['contrasts']
-
-    efficiencies = np.load(efficiencies_file)
-
-    # TODO: remove fixed rows count
-    n_rows = 3
-    n_cols = int(np.ceil(contrasts.shape[0] / n_rows))
+def plot_distribs(design_idx, efficiencies, contrasts_names, fig_file=None):
+    # n_rows = 3
+    # n_cols = int(np.ceil(contrasts_names.shape[0] / n_rows))
+    n_rows = int(np.ceil(np.sqrt(len(contrasts_names))))
+    n_cols = int(np.ceil(len(contrasts_names)/float(n_rows)))
 
     fig = plt.figure(figsize=(15,10))
-    for i, c in enumerate(contrasts):
+    for i, c in enumerate(contrasts_names):
         hist = np.histogram(efficiencies[i], bins=30)
-        best_eff = efficiencies[i, design_index]
+        best_eff = efficiencies[i, design_idx]
         inf_indexes = efficiencies[i] <= best_eff
         eff_rep = np.sum(efficiencies[i, inf_indexes]) / np.sum(efficiencies[i], dtype=float)
 
@@ -150,7 +146,7 @@ def plot_n_matrix(designs_indexes, designs, tr, fig_file=None):
 
     for i, idx in enumerate(designs_indexes):
         ax = plt.subplot(n_rows, n_cols, i+1)
-        x = design_matrix(tr, designs[idx])
+        x = design_matrix(designs[idx], tr)
         plot_design_matrix(x, ax=ax)
         plt.title("{} - design n°{}".format(i+1, idx))
 

@@ -39,4 +39,4 @@ tr = 0.955
 nbr_designs = 2000
 
 write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrasts_names, durations, files_list,
-                      files_path, iti_file, nbr_designs, tmp, tmn, tr, output_path, verbose=True)
+                      iti_file, nbr_designs, tmp, tmn, tr, output_path)

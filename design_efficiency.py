@@ -43,27 +43,46 @@ class ConvergenceError(Exception):
         return repr(self.value)
 
 
-def design_matrix(design, tr, final_isi):
+def design_matrix(design, tr):
     """Construct a design matrix using given parameter and nistat package.
 
     :param tr: Repetition time (in seconds)
-    :param conditions: Vector giving condition of each stimulation of the scan as integer
-    :param onsets: Vector of onsets of all stimuli of the scan (in seconds)
-    :param final_isi: Last ISI (in seconds)
     :return: The design matrix given by nistats
     """
     # frame times
-    total_duration = design['onsets'][-1] + design['duration'][-1]
+    total_duration = design['onset'][-1] + design['duration'][-1]
     n_scans = np.ceil(total_duration/tr)
     frame_times = np.arange(n_scans) * tr
 
-    # event-related design matrix
-    # paradigm = pd.DataFrame({'trial_type': conditions, 'onset': onsets})
-
     # TODO: check what does the duration vector on the design matrix (does make change with with single event ? =
     # short block)
-    x = make_design_matrix(frame_times, design, drift_model='blank')
+    x = make_design_matrix(frame_times, pd.DataFrame(design), drift_model='blank')
     return x
+
+
+def design_to_ndarray(x, cond_names):
+    # x is a dict with a key for each regressor. each element of x is also a dict whitin each key correspond to a
+    # sample time. the output of the function is just a dict that contain the time series of each regressor (no time
+    # values)
+    x = x.to_dict()
+    t_vect = np.sort(list(x['constant'].keys()))
+
+    dm = []
+    # For each regressor
+    for cond in cond_names:
+        vals = []
+        # Keep just the signal's value for each sample
+        for t in t_vect:
+            vals.append(x[cond][t])
+        dm.append(vals)
+
+    vals = []
+    # Keep just the signal's value for each sample
+    for t in t_vect:
+        vals.append(x['constant'][t])
+    dm.append(vals)
+
+    return np.array(dm)
 
 
 def efficiency(xmatrix, c):
@@ -138,14 +157,8 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
         s = np.sum(count_by_cond_orig[conds_of_grp[g]])
         probas.append(count_by_cond_orig[conds_of_grp[g]] / s)
 
-    if Nj != tmn.shape[1]:
-        warnings.warn("Conditions count doesn't match TMn's columns count.")
-    # TODO: resolve the comparison problem
-    # if unique_grp != np.arange(0, Nj):
-        # warnings.warn("Groupes indexes are not from 0 to Nj-1.")
-
     nbr_events = int(np.sum(count_by_cond_orig))
-    seqs = np.zeros((nbr_designs, nbr_events), dtype=int)
+    cond_seqs = np.zeros((nbr_designs, nbr_events), dtype=int)
 
     t = time.time()
     tentatives = 0
@@ -234,25 +247,25 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
             raise ConvergenceError("The design didn't succeded to complete during conditions attribution.")
 
         # Test if the sequence already exist
-        if seqs.__contains__(seq):
+        if cond_seqs.__contains__(seq):
             # If it is, try again
             tentatives + 1
             # If too many try have been performed, exit
             if tentatives > iter_max:
                 raise ConvergenceError("Impossible to create new different design in {} iterations.".format(iter_max))
         else:
-            seqs[i] = seq.T
+            cond_seqs[i] = seq.T
             i += 1
 
-    return seqs
+    return cond_seqs, seq_grp
 
 
 # def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, verbose=False):
-def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files, cond_names, cond_groups, tmp, tmn,
-                     iti_filename, start_at=2.0, verbose=False):
+def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files, cond_names, cond_groups, group_names,
+                     tmp, tmn, iti_filename, start_time, verbose=False):
     """Create random designs that follow the configuration paramaters (nbr of designs, transition matrix, tr ...etc).
 
-    :param start_at: (optional) Time before the first onset (in seconds). Default: 2.0 seconds.
+    :param start_time: (optional) Time before the first onset (in seconds). Default: 2.0 seconds.
     :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
     :return: a array of pandas' dataframe containing all the designs.
     """
@@ -262,11 +275,11 @@ def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files,
     # Get condtions order of all desgins
     if verbose:
         print('Generate conditions orders')
-    conds = generate_sequence(cond_counts, cond_groups, nbr_seqs, tmp, tmn, verbose=verbose)
+    conds, groups = generate_sequence(cond_counts, cond_groups, nbr_seqs, tmp, tmn, verbose=verbose)
 
     # Get file order of each designs and so get duration order also (will be used to generate design matrix)
     if verbose:
-        print("Creating file list of each desing")
+        print("Creating file list of each design")
     files_orders = []
     durations_tab = []
     for i, seq in enumerate(conds):
@@ -295,7 +308,7 @@ def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files,
         iti_indexes = np.random.permutation(nbr_events-1)
         iti_list = iti_orig[iti_indexes]
 
-        onsets[i, 0] = start_at
+        onsets[i, 0] = start_time
         for j in range(1, nbr_events):
             onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][j-1]) + iti_list[j-1] # .replace(',', '.')
 
@@ -307,17 +320,15 @@ def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files,
     designs = []
     for i in range(nbr_seqs):
         trial_types = np.array([cond_names[j] for j in conds[i]])
-        design = {"onset": onsets[i], "trial_type": trial_types, "files": files_orders[i],
-                  "duration": durations_tab[i]}
+        trial_group = np.array([group_names[j] for j in groups[i]])
+        design = {"onset": onsets[i], "trial_type": trial_types, "group": trial_group, "type_idx": conds[i], "files":
+                  files_orders[i], "duration": durations_tab[i]}
         designs.append(design)
-    # pickle.dump(designs, open(op.join(params['output_path'], designs_file), "wb"))
-    # if verbose:
-    #     print("Designs have been saved to: " + op.join(params['output_path'], designs_file))
-    # np.save(designs_file, [onsets, conds, files_orders, durations_tab])
+
     return designs, isi_maxs
 
 
-def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=9, fc1=1/120, verbose=False):
+def compute_efficiencies(tr, designs, contrasts, isi_maxs, cond_names, nf=9, fc1=1/120, verbose=False):
     """Compute efficiencies of each designs and each contrasts.
 
     Each regressor of the design matrix (each one corresponding to a condition) is filtered by a butterwotrh filter and
@@ -329,12 +340,6 @@ def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=9, fc1=1/120, verb
     :return:
     """
     nbr_tests = len(designs)
-
-    # # Read designs
-    # onsets = designs['onsets']
-    # conditions = np.array(designs['conditions'], dtype=int)
-    # durations_tab = designs['durations']
-    # isi_maxs = designs['max_ISIs']
 
     nbr_contrasts = contrasts.shape[0]
 
@@ -360,15 +365,16 @@ def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=9, fc1=1/120, verb
                 print("%ds: contrast %d/%d - efficiency evaluation %d/%d" %
                       (time.time() - t, i + 1, nbr_contrasts, k + 1, nbr_tests))
 
-            X = design_matrix(tr, design)
+            X = design_matrix(design, tr)
+            X = design_to_ndarray(X, cond_names)
 
             # Filter each columns to compute efficiency only on the bold signal bandwidth
-            for j in range(X.shape[1] - 1):
+            for j in range(X.shape[0]-1):
                 # FIXME: if there is not enough scans, double filter might not be applied.
                 X[j] = signal.filtfilt(b, a, X[j])
 
             # Compute efficiency of this design for this contrast
-            efficiencies[i, k] = efficiency(X, c)
+            efficiencies[i, k] = efficiency(X.T, c)
 
     return efficiencies
 

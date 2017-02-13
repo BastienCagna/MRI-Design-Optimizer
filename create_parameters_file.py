@@ -13,9 +13,9 @@ import os.path as op
 
 
 # TODO: add pages number of the Hanson article in comments
-def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrast_names, files_duration,
-                          files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path,
-                          output_file="params.pck", verbose=False):
+def write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrast_names,
+                          files_duration, files_list, iti_file, nbr_designs, tmp, tmn, tr, work_dir,
+                          output_file="params.pck", responses=None, verbose=True):
     """
     Create the design configuration file containning parameters that's will be used by the pipeline.
 
@@ -33,7 +33,6 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
     :param tmp: Transition Matrix (previous) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
     :param tmn: Transition Matrix (next) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
     :param tr: Repetition time (in seconds).
-    :param output_path: (optional) Parameters file name. Default: params.p
     :param verbose: (optional) Print all parameters. Default: False.
     :return: Nothing. The parameters file is saved in the output_path.
     """
@@ -55,8 +54,9 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
         'cond_counts': count_by_cond,
         'cond_of_files': cond_of_files,
         'cond_groups': groups,
+        'group_names': group_names,
         'contrasts': contrasts,
-        'constrast_names': contrast_names,
+        'contrasts_names': contrast_names,
         'files_duration': files_duration,
         'files_list': files_list,
         'ITI_file': iti_file,
@@ -64,11 +64,12 @@ def write_parameters_file(conditions_names, cond_of_files, groups, contrasts, co
         'TMp': tmp,
         'TMn': tmn,
         'tr': tr,
-        'output_path': output_path
+        'responses': responses,
+        'work_dir': work_dir
     }
     if verbose:
         print(params)
 
-    pickle.dump(params, open(op.join(output_path, output_file), "wb"))
+    pickle.dump(params, open(op.join(work_dir, output_file), "wb"))
     return
 
