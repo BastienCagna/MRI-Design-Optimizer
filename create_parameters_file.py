@@ -15,7 +15,7 @@ import os.path as op
 # TODO: add pages number of the Hanson article in comments
 def write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrast_names,
                           files_duration, files_list, iti_file, nbr_designs, tmp, tmn, tr, work_dir,
-                          output_file="params.pck", responses=None, verbose=True):
+                          output_file="params.pck", responses=None, responses_dur=0, verbose=True):
     """
     Create the design configuration file containning parameters that's will be used by the pipeline.
 
@@ -65,6 +65,7 @@ def write_parameters_file(conditions_names, cond_of_files, groups, group_names, 
         'TMn': tmn,
         'tr': tr,
         'responses': responses,
+        'responses_dur': responses_dur,
         'work_dir': work_dir
     }
     if verbose:

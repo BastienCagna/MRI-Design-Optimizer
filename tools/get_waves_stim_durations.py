@@ -33,7 +33,7 @@ def wave_files_durations(files_list, files_path=None):
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print("\nAdd durations column to the stimuli databse file of a BIDS database.\n")
+        print("\nAdd duration column to the stimuli database file of a BIDS database.\n")
 
     bids_dir = sys.argv[1]
     paradigm = sys.argv[2]

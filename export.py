@@ -27,8 +27,7 @@ def to_labview(output_filename, design, trig_by_sec=13, last_isi_sec=4.0, final_
     groups = design['trial_group']
     files = design['files']
     durations = design['duration']
-
-    isi_vect = onsets[1:] - onsets[:-1] - question_dur
+    isi_vect = design['ITI']
 
     question_tr = int(question_dur * trig_by_sec)
 
@@ -80,7 +79,11 @@ def to_labview(output_filename, design, trig_by_sec=13, last_isi_sec=4.0, final_
     exp_durs.append(isi_tr)
     exp_response.append(0)
 
-    unused = np.zeros((len(onsets)*3 + 2, ), dtype=int)
+    if question_dur > 0 :
+        unused = np.zeros((len(onsets)*3 + 2, ), dtype=int)
+    else:
+        unused = np.zeros((len(onsets)*2 + 2, ), dtype=int)
+
     df = pd.DataFrame({"CONDITION": exp_conds, "TEXT": exp_text, "BMP_NAME": unused, "SON": exp_filenames,
                        "DURATION_TRIGGERS": exp_durs, "RESPONSE": exp_response, "UNUSED_1": unused, "UNUSED_2": unused})
 

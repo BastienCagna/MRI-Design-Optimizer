@@ -5,20 +5,6 @@
     MRI Design Optimisation Pipeline
     ================================
 
-    This module create a large set of design and compute efficiencies for each design and contrasts
-
-    Steps of this pipeline require that you previously created a parameters file using create_parameters_file.py
-
-    :Example
-    1 - Create the designs set:
-    $ python design_effeciency.py generate_designs /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/
-
-    2 - Compute corresponding efficiencies (for all designs and all contrasts):
-    $ python design_effeciency.py compute_efficiencies /hpc/banco/bastien.c/data/optim/identification/test_new_pipeline/
-
-    Todo:
-    * Generalise the process to any type of stimulation files. This version can be used only with .wav file for audio
-    stimulation.
 """
 
 import sys
@@ -51,19 +37,29 @@ def optimisation_process(params_path, n_sel):
     contrasts = params['contrasts']
     contrasts_names = params['contrasts_names']
     responses = params['responses']
-    response_dur = params['responses_dur']
+    resp_dur = params['responses_dur']
     work_dir = params['work_dir']
+
+    # Print some properties
+    print("Parameters file path: {}".format(params_path))
+    print("Working directory: {}".format(work_dir))
+    print("ITI file: {}".format(iti_filename))
+    print("\nNumber of designs: {}".format(nbr_designs))
+    print("Number of conditions: {}".format(len(cond_counts)))
+    print("Number of events: {}".format(int(np.sum(cond_counts))))
 
     # Create random designs (following transition probabilities)
     print("\n *** DESIGN CREATION ***")
+    itis = np.load(iti_filename)
     designs, isi_maxs = generate_designs(nbr_designs, cond_counts, files_list, files_duration, cond_of_files,
-                                         cond_names, cond_groups, group_names, tmp, tmn, iti_filename, start_time=2.0,
-                                         verbose=True)
-    pickle.dump({'desgins': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
+                                         cond_names, cond_groups, group_names, tmp, tmn, itis, start_time=2.0,
+                                         question_dur=resp_dur, verbose=True)
+
+    pickle.dump({'designs': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
 
     # Compute efficiencies of each design for each contrasts
     print("\n *** EFFICIENCIES COMPUTATION ***")
-    efficiencies = compute_efficiencies(tr, designs, contrasts, isi_maxs, cond_names, verbose=True)
+    efficiencies = compute_efficiencies(tr, designs, contrasts, isi_maxs, verbose=True)
     np.save(op.join(work_dir, "efficiencies.npy"), efficiencies)
 
     # Choose and plot best designs
@@ -99,10 +95,9 @@ def optimisation_process(params_path, n_sel):
             resp_v = [responses[j] for j in designs['trial_idx']]
         else:
             resp_v = None
-            response_dur = 0
 
-        to_labview(op.join(work_dir, "export/design_{:06d}.csv"), designs[idx], question_cond="Question",
-                   question_txt="+", question_dur=response_dur, responses_idx=resp_v)
+        to_labview(op.join(work_dir, "export/design_{:06d}.csv".format(idx)), designs[idx], question_cond="Question",
+                   question_txt="+", question_dur=resp_dur, responses_idx=resp_v)
 
     return
 

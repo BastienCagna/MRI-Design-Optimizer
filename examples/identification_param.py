@@ -18,14 +18,14 @@ stim_db = pd.read_csv("/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/
                       sep="\t")
 files_list = stim_db['File']
 durations = stim_db['Duration']
-conditions_names = ['Condition']
+conditions_names = stim_db['Condition']
 
 count_by_cond = np.ones((36,))
 cond_of_files = np.arange(36)
-iti_file = "/hpc/banco/bastien.c/data/optim/identification/ITIs.npy"
+iti_file = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/itis.npy"
 output_path = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/"
 tr = 0.955
-nbr_designs = 5000
+nbr_designs = 100000
 
 
 # Secondly, define tansitions table
@@ -41,6 +41,7 @@ K = Nwords * Nspeak
 groups = np.arange(1, K+1)
 group_names = np.repeat(["Anne", "Betty", "Chloe"], Nwords)
 responses_of_cond = np.repeat([-1, -2, -3], Nwords)
+responses_dur = np.repeat([5.0], K)
 
 
 # TMp matrix contains all possible couple of condition excepted two time the same word (regardless of the speaker)
@@ -97,5 +98,6 @@ contrasts_names = ["Speaker 1 vs. Speaker 2",
 
 
 write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrasts_names, durations,
-                      files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path, responses=responses_of_cond)
+                      files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path, responses=responses_of_cond,
+                      responses_dur=responses_dur)
 

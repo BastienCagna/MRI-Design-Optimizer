@@ -25,14 +25,15 @@
 """
 
 import numpy as np
-import os.path as op
 import pickle
 import sys
 import time
 from scipy import signal
-from nistats.design_matrix import make_design_matrix
+from nistats.design_matrix import make_design_matrix, plot_design_matrix
 import warnings
 import pandas as pd
+
+import matplotlib.pyplot as plt
 
 
 class ConvergenceError(Exception):
@@ -43,14 +44,14 @@ class ConvergenceError(Exception):
         return repr(self.value)
 
 
-def design_matrix(design, tr):
+def design_matrix(design, tr, last_iti=2.0):
     """Construct a design matrix using given parameter and nistat package.
 
     :param tr: Repetition time (in seconds)
     :return: The design matrix given by nistats
     """
     # frame times
-    total_duration = design['onset'][-1] + design['duration'][-1]
+    total_duration = design['onset'][-1] + design['duration'][-1] + design['ITI'][-1]
     n_scans = np.ceil(total_duration/tr)
     frame_times = np.arange(n_scans) * tr
 
@@ -69,7 +70,7 @@ def design_to_ndarray(x, cond_names):
 
     dm = []
     # For each regressor
-    for cond in cond_names:
+    for cond in np.unique(cond_names):
         vals = []
         # Keep just the signal's value for each sample
         for t in t_vect:
@@ -95,7 +96,7 @@ def efficiency(xmatrix, c):
     """
     xcov = np.dot(xmatrix.T, xmatrix)
     ixcov = np.linalg.inv(xcov)
-    e = 1 / np.dot( np.dot(c, ixcov) , c.T )
+    e = 1 / np.dot( np.dot(c, ixcov), c.T)
     return e
 
 
@@ -159,13 +160,15 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
 
     nbr_events = int(np.sum(count_by_cond_orig))
     cond_seqs = np.zeros((nbr_designs, nbr_events), dtype=int)
+    cond_grps = np.zeros((nbr_designs, nbr_events), dtype=int)
 
     t = time.time()
     tentatives = 0
     i = 0
     while i < nbr_designs:
-        if verbose is True and np.mod(i, nbr_designs/10) == 0:
-            print("%f - %d" % (time.time()-t, i))
+        if verbose is True:
+            if np.mod(i, nbr_designs/100) == 0:
+                print("[{:.3f}s] {:2.0f}%".format(time.time()-t, 100*i/nbr_designs))
 
         # Vector of events
         seq = -1 * np.ones((nbr_events, 1), dtype=int)
@@ -255,14 +258,15 @@ def generate_sequence(count_by_cond_orig, groups, nbr_designs, tmp, tmn, iter_ma
                 raise ConvergenceError("Impossible to create new different design in {} iterations.".format(iter_max))
         else:
             cond_seqs[i] = seq.T
+            cond_grps[i] = seq_grp
             i += 1
 
-    return cond_seqs, seq_grp
+    return cond_seqs, cond_grps
 
 
 # def generate_designs(params_path, params_file="params.p", designs_file="designs.p", start_at=2.0, verbose=False):
 def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files, cond_names, cond_groups, group_names,
-                     tmp, tmn, iti_filename, start_time, verbose=False):
+                     tmp, tmn, iti_orig, start_time, question_dur=0, verbose=False):
     """Create random designs that follow the configuration paramaters (nbr of designs, transition matrix, tr ...etc).
 
     :param start_time: (optional) Time before the first onset (in seconds). Default: 2.0 seconds.
@@ -301,18 +305,21 @@ def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files,
     # Create a new onset vector by drawing new event independently of the condition index
     if verbose:
         print("Generating ITI orders")
-    iti_orig = np.load(iti_filename)
     onsets = np.zeros((nbr_seqs, nbr_events))
     isi_maxs = np.zeros((nbr_seqs,))
+    itis = np.zeros((nbr_seqs, nbr_events))
     for i in range(nbr_seqs):
-        iti_indexes = np.random.permutation(nbr_events-1)
+        iti_indexes = np.random.permutation(nbr_events)
         iti_list = iti_orig[iti_indexes]
+        itis[i] = iti_list
 
         onsets[i, 0] = start_time
         for j in range(1, nbr_events):
-            onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][j-1]) + iti_list[j-1] # .replace(',', '.')
+            # Next onset  = previosu onset + previous stimulus duration + ITI
+            onsets[i, j] = onsets[i, j-1] + float(durations_tab[i][j-1]) + iti_list[j-1] + question_dur
 
         # Find maximal isi (for the filtering of design matrix)
+        # FIXME: Interval between last onset and the end is not taken in account. Is it a problem?
         isi_v = onsets[i, 1:] - onsets[i, :-1]
         isi_maxs[i] = np.max(isi_v)
 
@@ -320,15 +327,37 @@ def generate_designs(nbr_seqs, cond_counts, filenames, durations, cond_of_files,
     designs = []
     for i in range(nbr_seqs):
         trial_types = np.array([cond_names[j] for j in conds[i]])
-        trial_group = np.array([group_names[j] for j in groups[i]])
-        design = {"onset": onsets[i], "trial_type": trial_types, "group": trial_group, "type_idx": conds[i], "files":
-                  files_orders[i], "duration": durations_tab[i]}
+        trial_group = np.array([group_names[j-1] for j in groups[i]])
+        design = {"onset": onsets[i], "trial_type": trial_types, "trial_group": trial_group, "type_idx": conds[i],
+                  "files": files_orders[i], "duration": durations_tab[i], "ITI": itis[i]}
         designs.append(design)
 
     return designs, isi_maxs
 
 
-def compute_efficiencies(tr, designs, contrasts, isi_maxs, cond_names, nf=9, fc1=1/120, verbose=False):
+def filtered_design_matrix(tr, design, isi_max, nf=6, fc1=1/120):
+    # Construct the proper filter
+    fs = 1 / tr
+    w1 = 2 * fc1 / fs
+    fc2 = 1 / isi_max
+    w2 = 2 * fc2 / fs
+    if w2 > 1:
+        warnings.warn("w2 was automatically fixed to 1.")
+        w2 = 1
+    b, a = signal.iirfilter(nf, [w1, w2], rs=80, rp=0, btype='band', analog=False, ftype='butter')
+
+    X = design_matrix(design, tr)
+
+    # Filter each columns to compute efficiency only on the bold signal bandwidth
+    for c in X.keys():
+        # If filter is not doing good job, test him in tools/filter_benchmark.py
+        # If ISI are too long, you might need to reduce the filter order.
+        X[c] = signal.filtfilt(b, a, X[c])
+
+    return X
+
+
+def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=6, fc1=1/120, verbose=False):
     """Compute efficiencies of each designs and each contrasts.
 
     Each regressor of the design matrix (each one corresponding to a condition) is filtered by a butterwotrh filter and
@@ -345,36 +374,19 @@ def compute_efficiencies(tr, designs, contrasts, isi_maxs, cond_names, nf=9, fc1
 
     efficiencies = np.zeros((nbr_contrasts, nbr_tests))
 
-    # Unvariants filter parameters
-    fs = 1 / tr
-    w1 = 2 * fc1 / fs
-
     t = time.time()
     for (i, c) in enumerate(contrasts):
+        print("[{:.3f}s] contrast {}/{}:".format(time.time() - t, i + 1, nbr_contrasts), end="   ")
         for k, design in enumerate(designs):
-            # Construct the proper filte
-            fc2 = 1 / isi_maxs[k]
-            w2 = 2 * fc2 / fs
-            if w2 > 1:
-                warnings.warn("w2 was automatically fixed to 1.")
-                w2 = 1
-            b, a = signal.iirfilter(nf, [w1, w2], rs=80, rp=0, btype='band', analog=False, ftype='butter')
-
             # compute efficiency of all examples
             if verbose and np.mod(k, nbr_tests / 10) == 0:
-                print("%ds: contrast %d/%d - efficiency evaluation %d/%d" %
-                      (time.time() - t, i + 1, nbr_contrasts, k + 1, nbr_tests))
+                print("{:2.0f}%".format((100*k/nbr_tests)), end="  ")
 
-            X = design_matrix(design, tr)
-            X = design_to_ndarray(X, cond_names)
-
-            # Filter each columns to compute efficiency only on the bold signal bandwidth
-            for j in range(X.shape[0]-1):
-                # FIXME: if there is not enough scans, double filter might not be applied.
-                X[j] = signal.filtfilt(b, a, X[j])
+            X = filtered_design_matrix(tr, design, isi_maxs[k], fc1=fc1, nf=nf)
 
             # Compute efficiency of this design for this contrast
-            efficiencies[i, k] = efficiency(X.T, c)
+            efficiencies[i, k] = efficiency(X, c)
+        print("")
 
     return efficiencies
 

@@ -13,6 +13,7 @@ contrasts_names = ["Contrast 1", "Contrast 2", "Contrast 3", "Contrast 4"]
 
 #  Transitions Constraints
 groups = [1, 1, 1, 2, 2, 2]
+groups_names = ["G1", "G2"]
 
 tmp = [
     [1],
@@ -36,7 +37,8 @@ output_path = "/hpc/banco/bastien.c/data/optim/test/balanced/"
 files_path = "./"
 
 tr = 0.955
-nbr_designs = 2000
+nbr_designs = 10
 
-write_parameters_file(conditions_names, cond_of_files, groups, contrasts, contrasts_names, durations, files_list,
-                      iti_file, nbr_designs, tmp, tmn, tr, output_path)
+write_parameters_file(conditions_names, cond_of_files, groups, groups_names, contrasts, contrasts_names, durations,
+                      files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path)
+
