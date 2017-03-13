@@ -1,10 +1,8 @@
-import os.path as op
 import pickle
 import sys
-from os import system
 
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
 import seaborn as sns
 from nistats.design_matrix import plot_design_matrix
 
@@ -32,55 +30,6 @@ def plot_distribution(efficiencies, contrast, i_best=-1, perc_best=0, i_worst=-1
 
     plt.ylim((0, height))
     plt.title(contrast)
-
-
-def plot_points(result_files, legends, fig_file=None):
-    data = []
-    for i, file in enumerate(result_files):
-        data_file = pickle.load(open(file, "rb"))
-        data.append(data_file['data'])
-    data = np.array(data)
-    ymin = np.min(data[:, :, 1])
-    ymax = np.max(data[:, :, 1])
-
-    fig = plt.figure(figsize=(14,10))
-    colors = ['r', 'g', 'b']
-    for i, file in enumerate(result_files):
-        plt.scatter(data[i, :, 0], data[i, :, 1], c=colors[i], alpha=0.8, s=60)
-
-    plt.ylim((0.95*ymin, 1.05*ymax))
-    plt.xlabel("Number of designs")
-    plt.ylabel("Efficiency")
-    plt.xscale('log')
-    plt.legend(legends)
-
-    if fig_file is not None:
-        fig.savefig(fig_file)
-
-
-def plot_box(result_files, legends, fig_file=None):
-    eff_vect = []
-    k_vect = []
-    const_vect = []
-    for i, file in enumerate(result_files):
-        data_file = pickle.load(open(file, "rb"))
-        data_tmp = data_file['data']
-        eff_vect.append(data_tmp[:, 1])
-        k_vect.append(data_tmp[:, 0])
-        const_vect.append(np.repeat(legends[i], data_tmp.shape[0]))
-    eff_vect = np.array(eff_vect).flatten()
-    const_vect = np.array(const_vect).flatten()
-    k_vect = np.array(k_vect).flatten()
-    data = {'Constraints': const_vect, 'Number of designs': k_vect, 'Efficiency': eff_vect}
-
-    fig = plt.figure(figsize=(18, 9))
-    sns.boxplot(x='Number of designs', y="Efficiency", hue="Constraints", data=data, palette="Set2")
-    plt.xlabel("Number of designs", fontsize=14)
-    plt.ylabel("Efficiency", fontsize=14)
-    plt.title("Best efficiency vs. Number of designs used to find best design", fontsize=16)
-
-    if fig_file is not None:
-        fig.savefig(fig_file)
 
 
 def plot_distribs(design_idx, efficiencies, contrasts_names, fig_file=None):
@@ -130,35 +79,14 @@ def plot_n_matrix(designs_indexes, designs, tr, fig_file=None):
 
 
 if __name__ == "__main__":
-    # PRINT BEST EFFICIENCIES VS NBR OF DESIGNS
-    # legend = ['No constraint', 'Alpha 95%']
-    # files = [result_path + 'data_no_constraint.p', result_path + "data_a95.p"]
-    # plot_points(files, legend, result_path + fig_name)
-    # plot_box(files, legend, result_path + fig_name)
+    params_file = sys.argv[1]
+    design_list_file = sys.argv[2]
+    design_idx = int(sys.argv[3])
 
-    # PLOT N BEST DESGIN MATRIXES
-    param_path = sys.argv[1]
-    if len(sys.argv) > 2:
-        params = pickle.load(open(op.join(param_path, sys.argv[2]), "rb"))
-    else:
-        params = pickle.load(open(op.join(param_path, "params.p"), "rb"))
-    path = params['output_path']
+    params = pickle.load(open(params_file, "rb"))
+    data = pickle.load(open(design_list_file, "rb"))
 
-    best_indexes = np.load(op.join(path, "bests.npy"))
-    plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_bests.png"))
+    x_mat = design_matrix(data['designs'][design_idx], params['tr'])
+    plot_design_matrix(x_mat)
 
-    if not op.isdir(op.join(path, "distribs_bests")):
-        system("mkdir {}".format(op.join(path, "distribs_bests")))
-    for index in best_indexes:
-        plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
-                      op.join(path, "distribs_bests/{:05d}.png".format(index)))
-
-    best_indexes = np.load(op.join(path, "avgs.npy"))
-    plot_n_matrix(best_indexes, path, fig_file=op.join(path, "desgins_matrix_avgs.png"))
-
-    if not op.isdir(op.join(path, "distribs_avgs")):
-        system("mkdir {}".format(op.join(path, "distribs_avgs")))
-    for index in best_indexes:
-        plot_distribs(op.join(path, "params.p"), op.join(path, "efficiencies.npy"), index,
-                      op.join(path, "distribs_avgs/{:05d}.png".format(index)))
-
+    plt.show()
