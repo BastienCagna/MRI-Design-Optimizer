@@ -17,7 +17,8 @@ import numpy as np
 
 matplotlib.use('Agg')
 
-from design_optimisation.design_efficiency import generate_designs, compute_efficiencies
+from design_optimisation.random_design_creator import generate_designs
+from design_optimisation.design_efficiency import compute_efficiencies
 from design_optimisation.selection import find_best_designs, find_avg_designs
 from design_optimisation.viewer import plot_n_matrix, plot_distribs
 from design_optimisation.export import to_labview
@@ -66,9 +67,6 @@ def optimisation_process(params_path, n_sel):
                                          cond_of_files, cond_names, cond_groups, group_names, tmp, tmn, itis,
                                          start_time=2.0, question_dur=resp_dur, verbose=True)
     pickle.dump({'designs': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
-    # data = pickle.load(open(op.join(work_dir, "designs.pck"), "rb"))
-    # designs = data['designs']
-    # isi_maxs = data['isi_maxs']
 
     # Compute efficiencies of each design for each contrasts
     print("\n *** EFFICIENCIES COMPUTATION ***")
