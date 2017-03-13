@@ -1,19 +1,14 @@
-# Because otherwise "$DISPLAY" is not defined in batch mode
-import matplotlib
-matplotlib.use('Agg')
-
-import numpy as np
-import pickle
-import pandas as pd
 import os.path as op
+import pickle
 import sys
 from os import system
 
-from nistats.design_matrix import make_design_matrix, plot_design_matrix
-from design_efficiency import design_matrix
-
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from nistats.design_matrix import plot_design_matrix
+
+from design_optimisation.design_efficiency import design_matrix
 
 
 def plot_distribution(efficiencies, contrast, i_best=-1, perc_best=0, i_worst=-1, perc_worst=0, eff_min=-1, eff_max=-1):
@@ -115,26 +110,6 @@ def plot_distribs(design_idx, efficiencies, contrasts_names, fig_file=None):
 
     if fig_file is not None:
         fig.savefig(fig_file)
-
-
-# TODO: add optional conditions grouping parameter
-def plot_simple_design(ax, design, tr, durations, SOAmax):
-    conditions = design[1]
-    onsets = design[0]
-    print("WARNING: DESIGN DURATION HAS CHANGED")
-    # total_duration = onsets[-1] + durations[int(conditions[-1])] + SOAmax
-    total_duration = onsets[-1] + float(durations[0][-1].replace(",", "."))+ SOAmax
-
-    n_scans = np.ceil(total_duration/tr)
-    frame_times = np.arange(n_scans) * tr
-
-    # pool condtions
-    # print("WARNING CONDITIONS ARE POOLED")
-    # conditions = np.array(np.mod(conditions,12), dtype=int)
-    # conditions = np.array(conditions/12, dtype=int)
-
-    paradigm = pd.DataFrame({'trial_type': conditions, 'onset': onsets})
-    X = make_design_matrix(frame_times, paradigm, drift_model='blank')
 
 
 def plot_n_matrix(designs_indexes, designs, tr, fig_file=None):

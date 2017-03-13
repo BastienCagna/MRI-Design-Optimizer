@@ -1,13 +1,11 @@
-import pickle
-import pandas as pd
 import os.path as op
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import seaborn as sns
+import pickle
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+from design_optimisation.design_efficiency import filtered_design_matrix, efficiency
 from test_ITI.iti_test_common import set_fixed_iti, set_random_iti
-from design_efficiency import filtered_design_matrix, efficiency
 
 inpath = "/hpc/banco/bastien.c/data/optim/calibrator_iti"
 outpath = "/hpc/banco/bastien.c/data/optim/calibrator_iti/normal_distrib"

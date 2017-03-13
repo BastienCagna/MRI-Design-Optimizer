@@ -1,5 +1,6 @@
-from create_parameters_file import write_parameters_file
 import numpy as np
+
+from design_optimisation.create_parameters_file import write_parameters_file
 
 contrasts = [
     [-1, 1]

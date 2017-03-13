@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from create_parameters_file import write_parameters_file
 import numpy as np
 
 

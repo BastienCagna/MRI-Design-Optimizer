@@ -15,9 +15,6 @@ Stochastic Designs in Event-Related fMRI and the article of Hanson
 The project is new and not finished at all. Experimentation on an audio
 stimulation study is currently in progress.
 
-### Todo
-* Validate the pipeline;
-
 ## The pipeline
 The process is divided in five different parts:
 
@@ -29,6 +26,14 @@ The process is divided in five different parts:
 
 The package provides also some viewing functions. You can, for example
 see the efficiencies distribution over all the designs for each contrast.
+
+### Inputs
+To do...
+
+### Output
+* designs.pck:
+* efficiencies.pck:
+* ...
 
 ## Design's parameters
 (comming soon...)

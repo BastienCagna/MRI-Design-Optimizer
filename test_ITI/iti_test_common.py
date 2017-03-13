@@ -1,11 +1,4 @@
 import numpy as np
-import pandas as pd
-import os.path as op
-import pickle
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-from design_efficiency import filtered_design_matrix, efficiency
 
 
 def set_fixed_iti(design, const_iti=0):

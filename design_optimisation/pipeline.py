@@ -7,22 +7,33 @@
 
 """
 
-import sys
-from os import system
 import os.path as op
 import pickle
+import sys
+from os import system
+
+import matplotlib
 import numpy as np
 
-from design_efficiency import generate_designs, compute_efficiencies
-from selection import find_best_designs, find_avg_designs
-from viewer import plot_n_matrix, plot_distribs
-from export import to_labview
+matplotlib.use('Agg')
+
+from design_optimisation.design_efficiency import generate_designs, compute_efficiencies
+from design_optimisation.selection import find_best_designs, find_avg_designs
+from design_optimisation.viewer import plot_n_matrix, plot_distribs
+from design_optimisation.export import to_labview
 
 
 def optimisation_process(params_path, n_sel):
+    """Design optimisation pipeline
+
+    :param params_path: Path to the paramaters file
+    :param n_sel: Number of design to select and export
+    :return:
+    """
     # Read parameters
     params = pickle.load(open(op.join(params_path, "params.pck"), "rb"))
     nbr_designs = params['nbr_designs']
+    nbr_events = params['nbr_events']
     cond_counts = params['cond_counts']
     files_list = params['files_list']
     files_duration = params['files_duration']
@@ -46,16 +57,18 @@ def optimisation_process(params_path, n_sel):
     print("ITI file: {}".format(iti_filename))
     print("\nNumber of designs: {}".format(nbr_designs))
     print("Number of conditions: {}".format(len(cond_counts)))
-    print("Number of events: {}".format(int(np.sum(cond_counts))))
+    print("Number of events: {}".format(nbr_events))
 
     # Create random designs (following transition probabilities)
     print("\n *** DESIGN CREATION ***")
     itis = np.load(iti_filename)
-    designs, isi_maxs = generate_designs(nbr_designs, cond_counts, files_list, files_duration, cond_of_files,
-                                         cond_names, cond_groups, group_names, tmp, tmn, itis, start_time=2.0,
-                                         question_dur=resp_dur, verbose=True)
-
+    designs, isi_maxs = generate_designs(nbr_designs, nbr_events, cond_counts, files_list, files_duration,
+                                         cond_of_files, cond_names, cond_groups, group_names, tmp, tmn, itis,
+                                         start_time=2.0, question_dur=resp_dur, verbose=True)
     pickle.dump({'designs': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
+    # data = pickle.load(open(op.join(work_dir, "designs.pck"), "rb"))
+    # designs = data['designs']
+    # isi_maxs = data['isi_maxs']
 
     # Compute efficiencies of each design for each contrasts
     print("\n *** EFFICIENCIES COMPUTATION ***")
@@ -76,7 +89,7 @@ def optimisation_process(params_path, n_sel):
 
     # Choose and plot "Average" designs
     print("\n *** SEARCHING FOR AVG DESGIN(S) ***")
-    avgs_idx = find_avg_designs(efficiencies, contrasts, n=n_sel, verbose=True)
+    avgs_idx = find_avg_designs(efficiencies, contrasts, n=n_sel)
     np.save(op.join(work_dir, "avgs_idx.npy"), avgs_idx)
 
     plot_n_matrix(avgs_idx, designs, tr, fig_file=op.join(work_dir, "desgins_matrix_avgs.png"))

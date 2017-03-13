@@ -1,15 +1,14 @@
-import numpy as np
-import pandas as pd
-import os.path as op
 import pickle
-import time
-import seaborn as sns
 import sys
+import time
+
+import numpy as np
+import seaborn as sns
 
 sys.path.append("/hpc/banco/bastien.c/python/design_optimizer")
 
 from test_ITI.iti_test_common import set_fixed_iti
-from design_efficiency import filtered_design_matrix, efficiency
+from design_optimisation.design_efficiency import filtered_design_matrix, efficiency
 
 # Plot options and config
 sns.set(rc={'grid.color': 'darkgrey', 'grid.linestyle': ':', 'figure.figsize': [11, 7]})

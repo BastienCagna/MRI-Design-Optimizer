@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from create_parameters_file import write_parameters_file
 import numpy as np
 import pandas as pd
+
+from design_optimisation.create_parameters_file import write_parameters_file
 
 # IDENTIFICATION TASK
 # The identification task is composed of 12 different words pronounced by 3 speakers. Each speaker pronounces the
@@ -23,7 +24,7 @@ conditions_names = stim_db['Condition']
 count_by_cond = np.ones((36,))
 cond_of_files = np.arange(36)
 iti_file = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/itis.npy"
-output_path = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/"
+output_path = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/new/"
 tr = 0.955
 nbr_designs = 100000
 
@@ -41,7 +42,6 @@ K = Nwords * Nspeak
 groups = np.arange(1, K+1)
 group_names = np.repeat(["Anne", "Betty", "Chloe"], Nwords)
 responses_of_cond = np.repeat([-1, -2, -3], Nwords)
-responses_dur = np.repeat([5.0], K)
 
 
 # TMp matrix contains all possible couple of condition excepted two time the same word (regardless of the speaker)
@@ -99,5 +99,5 @@ contrasts_names = ["Speaker 1 vs. Speaker 2",
 
 write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrasts_names, durations,
                       files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path, responses=responses_of_cond,
-                      responses_dur=responses_dur)
+                      question_dur=5.0)
 

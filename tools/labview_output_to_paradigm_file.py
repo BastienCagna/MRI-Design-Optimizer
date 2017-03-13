@@ -7,6 +7,14 @@ import os.path as op
 
 
 def set_real_onsets(paradigm, stim_db, is_a_question_step, start_with_iti=True):
+    """
+
+    :param paradigm:
+    :param stim_db:
+    :param is_a_question_step:
+    :param start_with_iti:
+    :return:
+    """
     onsets = paradigm['onset']
     files = paradigm['file']
 
@@ -95,18 +103,23 @@ def paradigm_to_mat(paradigm, mat_file):
     mat_struct['names'] = cond_names
     mat_struct['onsets'] = []
     mat_struct['durations'] = []
+    onsets_tab = []
+    dur_tab = []
     for cond in cond_names:
-        mat_struct['onsets'].append(np.array(paradigm['onset'][np.array(paradigm['trial_type']) == cond]).T)
+        onsets_tab.append(np.array(paradigm['onset'][np.array(paradigm['trial_type']) == cond], dtype=object))
 
         # Questions are just an event, so duration is set to 0
         if cond == "Question" or cond == "question":
-            mat_struct['durations'].append(0)
+            dur_tab.append(0)
         else:
-            mat_struct['durations'].append(np.array(paradigm['duration'][np.array(paradigm['trial_type']) == cond]).T)
+            dur_tab.append(np.array(paradigm['duration'][np.array(paradigm['trial_type']) == cond], dtype=object))
+
+    mat_struct['onsets'].append(onsets_tab)
+    mat_struct['durations'].append(dur_tab)
 
     io.savemat(mat_file, mat_struct)
     print("MATLAB file saved at: {}".format(mat_file))
-
+dfgh
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:

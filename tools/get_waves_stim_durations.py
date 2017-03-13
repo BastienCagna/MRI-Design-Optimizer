@@ -7,8 +7,6 @@ import numpy as np
 import pandas as pd
 import sys
 
-import global_consts as glb
-
 
 def wave_files_durations(files_list, files_path=None):
     """Compute wav signal duration for each files.

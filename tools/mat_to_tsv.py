@@ -33,7 +33,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 5:
         print("\nConvert .mat file to .tsv\n")
         print("--- Arguments ---")
-        print("  [1]  Path to the .mat file\n  [2] Path the new .tsv file")
+        print("  [1]  Path to the .mat file\n  [2]  Path the new .tsv file")
         print("  [3]  Name of the variable contained by the .mat file")
         print("  [4+] Columns names of the tsv file separated by whitespaces")
         print("\n--- Return ---\n  Create the new file corresponding to the given output filename.\n")

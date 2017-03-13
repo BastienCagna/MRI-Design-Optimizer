@@ -6,7 +6,7 @@ import numpy as np
 # TODO: finish this script
 nf = 6
 tr = 0.955
-isi_max = 16
+isi_max = 25
 fc1 = 1/120
 fc2 = 1/isi_max
 

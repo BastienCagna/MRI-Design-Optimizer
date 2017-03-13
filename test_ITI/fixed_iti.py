@@ -1,23 +1,24 @@
-import pickle
-import pandas as pd
 import os.path as op
-import numpy as np
+import pickle
+
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
+from design_optimisation.design_efficiency import filtered_design_matrix, efficiency
 from test_ITI.iti_test_common import set_fixed_iti
-from design_efficiency import filtered_design_matrix, efficiency
 
 # Plot options and config
 sns.set(rc={'grid.color': 'darkgrey', 'grid.linestyle': ':', 'figure.figsize': [11, 7]})
 
-N = 100
-type = 'avg'
+N = 9
+type = 'bests'
 
-params_file = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/calibrator/designs/params.pck"
-designs_file = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/calibrator/designs/designs.pck"
-selection_file = "/hpc/banco/bastien.c/data/optim/calibrator_iti/fixed_iti/{}_{}_designs_indexes.npy".format(type, N)
-outpath = "/hpc/banco/bastien.c/data/optim/calibrator_iti/fixed_iti"
+path = "/hpc/banco/bastien.c/data/optim/calibrator_iti/designs_iti_0_5_tmp/"
+params_file = path + "params.pck"
+designs_file = path + "designs.pck"
+selection_file = path + "{}_idx.npy".format(type)
+outpath = path + "out/"
 
 
 # Read params file to get TR

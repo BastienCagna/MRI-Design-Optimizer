@@ -3,11 +3,10 @@
 
 """
 
-    Use this function to create the parameters file needed for the design optimizer pipeline.
+    Create the parameters file needed for the design optimizer pipeline.
 
 """
 import numpy as np
-import scipy.io.wavfile as wf
 import pickle
 import os.path as op
 
@@ -15,14 +14,17 @@ import os.path as op
 # TODO: add pages number of the Hanson article in comments
 def write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrast_names,
                           files_duration, files_list, iti_file, nbr_designs, tmp, tmn, tr, work_dir,
-                          output_file="params.pck", responses=None, responses_dur=0, verbose=True):
+                          responses=None, question_dur=0, verbose=True):
     """
-    Create the design configuration file containning parameters that's will be used by the pipeline.
+    Create the parameters file containning general design paradigm and other parameters needed by the pipeline.
 
-    :param output_file: Working directory.
+    Arguments
+    =========
+
     :param conditions_names: Name of each condition.
     :param cond_of_files: Conditions of each file of the files_list.
     :param groups: Vector that give the group of each condition.
+    :param group_names: Name of each group.
     :param contrasts: List of contrasts. Each row of the array is a contrast. Last coeffcient of each row corresponds to
                       the intercept.
     :param contrast_names: Name of each contrasts (for final figures).
@@ -33,22 +35,40 @@ def write_parameters_file(conditions_names, cond_of_files, groups, group_names, 
     :param tmp: Transition Matrix (previous) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
     :param tmn: Transition Matrix (next) as defined by Hanson, 2015 (DOI: B978-0-12-397025-1.00321-3).
     :param tr: Repetition time (in seconds).
+    :param work_dir: Working directory. Output file of the pipeline will be saved in this directory.
+    :param responses: 1D array containing the expected response of each stimulus.
+    :param question_dur: Question duration (in second).
     :param verbose: (optional) Print all parameters. Default: False.
-    :return: Nothing. The parameters file is saved in the output_path.
+
+    Output
+    ======
+    :return: Nothing. The parameters file is saved in the working directory.
+
     """
+
+    # Ensure that variable are numpy array (to make research easier)
     tmp = np.array(tmp)
     tmn = np.array(tmn)
     contrasts = np.array(contrasts)
-
-    # Count for each condition, how many times she's appearing
+    contrast_names = np.array(contrast_names)
+    files_duration = np.array(files_duration)
+    files_list = np.array(files_list)
     cond_of_files = np.array(cond_of_files)
-    ucond = np.unique(cond_of_files)
-    nbr_cond = len(ucond)
-    count_by_cond = np.zeros((nbr_cond,))
-    for cond in ucond:
-        count_by_cond[cond] = np.sum(cond_of_files==cond)
+    conditions_names = np.array(conditions_names)
+    groups = np.array(groups)
+    group_names = np.array(group_names)
 
-    # Save conditions and onsets
+    ucond = np.unique(cond_of_files)
+    # nbr_cond = len(ucond)
+    # count_by_cond = np.zeros((nbr_cond,))
+    count_by_cond = {}
+    nbr_event = 0
+    for cond in ucond:
+        count_of_cond = np.sum(cond_of_files==cond)
+        count_by_cond[cond] = count_of_cond
+        nbr_event += count_of_cond
+
+    # Save parameters in a dictionnary
     params = {
         'cond_names': conditions_names,
         'cond_counts': count_by_cond,
@@ -61,16 +81,16 @@ def write_parameters_file(conditions_names, cond_of_files, groups, group_names, 
         'files_list': files_list,
         'ITI_file': iti_file,
         'nbr_designs': nbr_designs,
+        'nbr_events': nbr_event,
         'TMp': tmp,
         'TMn': tmn,
         'tr': tr,
         'responses': responses,
-        'responses_dur': responses_dur,
+        'responses_dur': question_dur,
         'work_dir': work_dir
     }
     if verbose:
         print(params)
 
-    pickle.dump(params, open(op.join(work_dir, output_file), "wb"))
+    pickle.dump(params, open(op.join(work_dir, "params.pck"), "wb"))
     return
-
