@@ -10,6 +10,8 @@ import warnings
 from scipy import signal
 from nistats.design_matrix import make_design_matrix
 
+from design_optimisation.contrast_definition import get_contrasts_list
+
 
 def design_matrix(design, tr):
     """Construct a design matrix using given parameter and nistat package.
@@ -74,45 +76,45 @@ def filtered_design_matrix(tr, design, isi_max, nf=6, fc1=1/120, filt_type='band
     return d_matrix
 
 
-def compute_efficiencies(tr, designs, contrasts, isi_maxs, nf=6, fc1=1/120, verbose=False):
+def compute_efficiencies(tr, designs, contrasts_def, isi_maxs, nf=6, fc1=1 / 120, verbose=False):
     """Compute efficiencies of each designs and each contrasts.
 
-    Each regressor of the design matrix (each one corresponding to a condition) is filtered by a butterwotrh filter and
+    Each regressor of the design matrix (each one corresponding to a condition) is filtered by a
+    butterwotrh filter and
     then the efficiency of the resulting matrix is computed.
 
     :param tr:
     :param designs:
-    :param contrasts:
+    :param contrasts_def:
     :param isi_maxs:
     :param nf: (optional) Order of the butterworth filter. Default: 9.
     :param fc1: (optional) High pass cutting frequency of the filter (in Hertz). Default: 1/120 Hz.
-    :param verbose: (optional) Set to True to get more printed details of the running. Default: False.
+    :param verbose: (optional) Set to True to get more printed details of the running. Default:
+    False.
     :return: efficiencies matrix (each row contains efficiencies of one design for all the
     contrasts)
     """
-    nbr_tests = len(designs)
-    nbr_contrasts = contrasts.shape[0]
-    efficiencies = np.zeros((nbr_contrasts, nbr_tests))
+    nbr_designs = len(designs)
+    nbr_contrasts = len(contrasts_def.keys())
+    eff_arr = np.zeros((nbr_contrasts, nbr_designs))
 
     t = time.time()
-    total_prc = 0
-    for (i, c) in enumerate(contrasts):
-        if verbose:
-            print("[{:.3f}s] contrast {}/{}".format(time.time() - t,
-                                                    i + 1, nbr_contrasts))
-        for k, design in enumerate(designs):
-            # compute efficiency of all examples
-            if verbose and np.mod(k, nbr_tests / 100) == 0:
-                prc = int(100 * k / nbr_tests)
-                print("[{:.3f}s] {}%  {:.02f}%".format(time.time() - t, prc, (total_prc +
-                                                                              prc/nbr_contrasts)))
 
-            d_matrix = filtered_design_matrix(tr, design, isi_maxs[k], fc1=fc1, nf=nf)
+    for k, design in enumerate(designs):
+        if verbose and np.mod(k, nbr_designs / 100) == 0:
+            print("[{:.3f}s] {}%".format(time.time() - t, int(100 * k / nbr_designs)))
 
+        d_matrix = filtered_design_matrix(tr, design, isi_maxs[k], fc1=fc1, nf=nf,
+                                          filt_type='highpass')
+
+        # Determine the place of all condition in the contrast vector
+        contrasts = get_contrasts_list(contrasts_def, design_matrix=d_matrix)
+
+        for (i, c_name) in enumerate(contrasts.keys()):
             # Compute efficiency of this design for this contrast
-            efficiencies[i, k] = efficiency(d_matrix, c)
-        total_prc += 100/nbr_contrasts
-    return efficiencies
+            eff_arr[i, k] = efficiency(d_matrix, contrasts[c_name])
+
+    return eff_arr
 
 
 if __name__ == "__main__":

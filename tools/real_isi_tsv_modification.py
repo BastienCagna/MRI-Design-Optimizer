@@ -58,6 +58,13 @@ def get_real_isi_onsets(run_file, stim_db_file, output_file, is_a_question_step=
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 4:
+        print(" Set real stimulation duration to labview output file")
+        print("\n*** Arguments ***")
+        print("\t[1]  Labview output file\n\t[2]  Stimuli database file")
+        print("\t[3]  New filename\n\t[4]  (opt.) Set to '1' if there is a question step\n")
+        exit(0)
+
     r_file = sys.argv[1]
     db_file = sys.argv[2]
     out_file = sys.argv[3]

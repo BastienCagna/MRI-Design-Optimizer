@@ -26,12 +26,10 @@ def to_labview(output_filename, design, trig_by_sec=13, last_iti_sec=4.0, final_
     iti_text = iti_text.strip()
 
     onsets = design['onset']
-    groups = design['trial_group']
+    conds = design['trial_type']
     files = design['files']
     durations = design['duration']
     iti_vect = design['ITI']
-
-    question_tr = int(question_dur * trig_by_sec)
 
     # CSV columns
     exp_conds = []
@@ -44,54 +42,52 @@ def to_labview(output_filename, design, trig_by_sec=13, last_iti_sec=4.0, final_
     iti_tr = int(onsets[0] * trig_by_sec)
     exp_conds.append("ITI")
     exp_text.append(iti_text)
-    exp_filenames.append("[Nothing]")
+    exp_filenames.append("[ITI]")
     exp_durs.append(iti_tr)
     exp_response.append(0)
 
     for i in range(len(onsets)):
         # Onset
         stim_dur_tr = int(np.ceil(durations[i] * trig_by_sec))
-        exp_conds.append(groups[i])
-        exp_text.append("")
-        exp_filenames.append(files[i].strip())
+        exp_conds.append(conds[i])
+        if conds[i] == 'answer':
+            exp_text.append("+")
+            exp_filenames.append("[ANSWER]")
+            if responses_idx is not None:
+                exp_response.append(responses_idx[i-1])
+            else:
+                exp_response.append(0)
+        else:
+            exp_text.append("")
+            exp_filenames.append(files[i].strip())
+            exp_response.append(0)
         exp_durs.append(stim_dur_tr)
-        exp_response.append(0)
 
-        # Optional fixed question time
-        if question_dur > 0:
-            exp_conds.append(question_txt)
-            exp_text.append(question_cond)
-            exp_filenames.append("[Question]")
-            exp_durs.append(question_tr)
-            exp_response.append(responses_idx[i])
-
-        # ITI
-        iti_tr = int(iti_vect[i] * trig_by_sec)
-        exp_conds.append("ITI")
-        exp_text.append(iti_text)
-        exp_filenames.append("[Nothing]")
-        exp_durs.append(iti_tr)
-        exp_response.append(0)
+        if iti_vect[i] > 0:
+            # ITI
+            iti_tr = int(iti_vect[i] * trig_by_sec)
+            exp_conds.append("ITI")
+            exp_text.append(iti_text)
+            exp_filenames.append("[ITI]")
+            exp_durs.append(iti_tr)
+            exp_response.append(0)
 
     # Final Word
     iti_tr = int(last_iti_sec * trig_by_sec)
-    exp_conds.append("[Final step]")
+    exp_conds.append("[END]")
     exp_text.append(final_word.strip())
-    exp_filenames.append("[Nothing]")
+    exp_filenames.append("[END]")
     exp_durs.append(iti_tr)
     exp_response.append(0)
 
-    if question_dur > 0:
-        unused = np.zeros((len(onsets)*3 + 2, ), dtype=int)
-    else:
-        unused = np.zeros((len(onsets)*2 + 2, ), dtype=int)
+    unused = np.zeros((len(exp_conds)), dtype=int)
 
     df = pd.DataFrame({"CONDITION": exp_conds, "TEXT": exp_text, "BMP_NAME": unused, "SON": exp_filenames,
                        "DURATION_TRIGGERS": exp_durs, "RESPONSE": exp_response, "UNUSED_1": unused, "UNUSED_2": unused})
 
     df.to_csv(output_filename,
               columns=["CONDITION", "TEXT", "BMP_NAME", "SON", "DURATION_TRIGGERS", "RESPONSE", "UNUSED_1", "UNUSED_2"],
-              index=False)
+              index=False, sep=",")
 
 
 if __name__ == "__main__":

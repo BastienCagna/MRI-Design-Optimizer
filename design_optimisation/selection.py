@@ -13,7 +13,7 @@ import pickle
 import warnings
 
 
-def find_best_designs(efficiencies, contrasts, n=1):
+def find_best_designs(efficiencies, nbr_contrasts, n=1):
     """Return one or several index(es) of designs that provide jointly best efficiencies for all contrasts.
 
     :param efficiencies: Array of efficiencies. Each row correspond to a desing. Each column correspond to a contrast.
@@ -23,7 +23,6 @@ def find_best_designs(efficiencies, contrasts, n=1):
     """
 
     nbr_tests = efficiencies.shape[1]
-    nbr_contrasts = contrasts.shape[0]
 
     # Distribution for each contrast
     eff_rep = np.zeros(efficiencies.shape)
@@ -48,7 +47,7 @@ def find_best_designs(efficiencies, contrasts, n=1):
     return i_best
 
 
-def find_avg_designs(efficiencies, contrasts, n=1):
+def find_avg_designs(efficiencies, nbr_contrasts, n=1):
     """Return one or several index(es) of designs close to the average efficiency for all contrasts.
 
     :param efficiencies: Array of efficiencies. Each row correspond to a desing. Each column correspond to a contrast.
@@ -57,7 +56,6 @@ def find_avg_designs(efficiencies, contrasts, n=1):
     :return: Numpy array of index(es) of selected design(s).
     """
     nbr_tests = efficiencies.shape[1]
-    nbr_contrasts = contrasts.shape[0]
 
     # Distribution for each contrast
     eff_rep = np.zeros(efficiencies.shape)

@@ -33,21 +33,22 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("\nAdd duration column to the stimuli database file of a BIDS database.\n")
 
-    bids_dir = sys.argv[1]
-    paradigm = sys.argv[2]
+    stim_db_file = sys.argv[1]
+    stim_dir = sys.argv[2]
+    if len(sys.argv) > 3:
+        separateur = sys.argv[3]
+    else:
+        separateur = ','
 
-    stim_db_filepath = op.join(bids_dir, glb.BIDS_PARADIGM_PATH, paradigm, glb.STIM_DB_FILENAME)
-    print("csv file: {}".format(stim_db_filepath))
-    stim_db_file = pd.read_csv(open(stim_db_filepath, 'r'), sep="\t")
+    print("csv file: {}".format(stim_db_file))
+    stim_db_file = pd.read_csv(open(stim_db_file, 'r'), sep=separateur)
 
     # Get the simuli file list from the stimuli database description file
-    files = stim_db_file[glb.STIM_DB_FILES_COLNAME]
+    files = stim_db_file['file']
 
     # Compure duration of each file
-    stim_db_file[glb.STIM_DB_DUR_COLNAME] = wave_files_durations(files,
-                                                                 files_path=op.join(bids_dir, glb.BIDS_PARADIGM_PATH,
-                                                                                    paradigm, glb.PARADIGM_STIM_DIR))
+    stim_db_file['duration'] = wave_files_durations(files,files_path=stim_dir)
 
     # Add durations to the stimuli database description file
-    stim_db_file.to_csv(open(stim_db_filepath, 'w'), index=False, sep="\t")
+    stim_db_file.to_csv(open(stim_db_file, 'w'), index=False, sep=separateur)
 

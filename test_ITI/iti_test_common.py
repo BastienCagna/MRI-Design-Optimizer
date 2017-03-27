@@ -26,3 +26,10 @@ def limited_duration(design, duration):
         new_design[k] = design[k][:i_max]
     return new_design
 
+
+def cut_design(design, dur):
+    sel = design['onset'] <= dur
+    for k in design.keys():
+        design[k] = np.array(design[k])[sel]
+
+    return design

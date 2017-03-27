@@ -3,6 +3,7 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import os.path as op
 
 from design_optimisation.design_efficiency import filtered_design_matrix, efficiency
 from test_ITI.iti_test_common import set_fixed_iti
@@ -11,61 +12,37 @@ from test_ITI.iti_test_common import set_fixed_iti
 sns.set(rc={'grid.color': 'darkgrey', 'grid.linestyle': ':', 'figure.figsize': [11, 7]})
 
 
-path = "/hpc/banco/bastien.c/data/optim/calibrator_iti/designs_iti_0_0_tmp/"
+path = "/hpc/banco/bastien.c/data/optim/calibrator_iti/designs_iti_0_0/"
 params_file = path + "params.pck"
 designs_file = path + "designs.pck"
 selection_file = path + "{}_idx.npy".format(type)
 outpath = path + "out/"
 
+N = 9
+contrasts = ["Young vs. old", "Male vs. Female", "Low F0 vs. Hight F0", "Non Speech vs. Speech" ]
+best_c = 'silver'
+avg_c = 'lightgray'
+sel_c ='goldenrod'
+idx_sel = 92632
+plt.figure()
+for j, contrast_name in enumerate(contrasts):
+    best_eff = np.load(op.join(outpath, "data_bests_{}_{}.npy".format(N, contrast_name)))
+    indexes_best = np.array(np.unique(best_eff[:, 1]), dtype=int)
+    avg_eff = np.load(op.join(outpath, "data_avgs_{}_{}.npy".format(N, contrast_name)))
+    indexes_avg = np.array(np.unique(avg_eff[:, 1]), dtype=int)
 
-# Read params file to get TR
-params = pickle.load(open(params_file, "rb"))
-tr = params['tr']
-contrasts = params['contrasts']
-c = contrasts[0]
+    plt.subplot(2, 2, j+1)
+    for i, idx in enumerate(indexes_avg):
+        plt.plot(avg_eff[avg_eff[:, 1] == idx, 0], avg_eff[avg_eff[:, 1] == idx, 2],
+                 color=avg_c)
 
-design_idx = 1
+        idx = indexes_best[i]
+        plt.plot(best_eff[best_eff[:, 1] == idx, 0], best_eff[best_eff[:, 1] == idx, 2],
+                 color=best_c)
 
-# Read designs
-print("Loading designs file...")
-data = pickle.load(open(designs_file, "rb"))
-isi_maxs = data["isi_maxs"]
-isi_max = isi_maxs[design_idx]
-designs = data['designs']
-design = designs[design_idx]
+        plt.plot(best_eff[best_eff[:, 1] == idx_sel, 0], best_eff[best_eff[:, 1] == idx_sel, 2],
+                 color=sel_c)
 
-
-# Define tested ITI
-nbr_ITI = 36
-ITI_val = np.logspace(-2, 1.2, num=nbr_ITI)
-
-
-# Compute efficiency for each ITI
-efficiencies = []
-hp_cut_freq = []
-for i, iti in enumerate(ITI_val):
-    print("ITI {: 2d}/{} : {}".format(i+1, nbr_ITI, iti))
-    # Create a design for each iti value
-    # tmp_design = set_fixed_iti(ref_design, iti)
-    tmp_design = set_fixed_iti(design, iti)
-
-    isi_m = isi_max + iti
-    hp_cut_freq.append(1 / isi_m)
-
-    X = filtered_design_matrix(tr, tmp_design, isi_m, filt_type='highpass')
-
-    # Compute efficiency of this design for this contrast
-    eff = efficiency(X, c)
-    efficiencies.append([iti, eff])
-efficiencies = np.array(efficiencies)
-
-
-# Plot
-fig, ax = plt.subplots()
-plt.plot(efficiencies[:, 0], efficiencies[:, 1])
-plt.xlabel("ITI (s)")
-plt.xscale('log')
-plt.ylabel("Efficiency (arbitrary)")
-plt.title("Efficiency vs. fixed ITI duration")
-
+        plt.xscale("log")
+        plt.title(contrast_name)
 plt.show()

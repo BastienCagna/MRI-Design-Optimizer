@@ -16,7 +16,8 @@ import matplotlib
 import numpy as np
 
 matplotlib.use('Agg')
-
+# FIXME: remove the following line
+sys.path.append("/hpc/banco/bastien.c/python/design_optimizer/")
 from design_optimisation.random_design_creator import generate_designs
 from design_optimisation.design_efficiency import compute_efficiencies
 from design_optimisation.selection import find_best_designs, find_avg_designs
@@ -46,11 +47,12 @@ def optimisation_process(params_path, n_sel):
     tmp = params['TMp']
     tmn = params['TMn']
     tr = params['tr']
-    contrasts = params['contrasts']
-    contrasts_names = params['contrasts_names']
+    contrasts_def = params['contrasts_def']
     responses = params['responses']
     resp_dur = params['responses_dur']
     work_dir = params['work_dir']
+
+    contrasts_names = contrasts_def.keys()
 
     # Print some properties
     print("Parameters file path: {}".format(params_path))
@@ -61,54 +63,65 @@ def optimisation_process(params_path, n_sel):
     print("Number of events: {}".format(nbr_events))
 
     # Create random designs (following transition probabilities)
-    print("\n *** DESIGN CREATION ***")
-    itis = np.load(iti_filename)
-    designs, isi_maxs = generate_designs(nbr_designs, nbr_events, cond_counts, files_list, files_duration,
-                                         cond_of_files, cond_names, cond_groups, group_names, tmp, tmn, itis,
-                                         start_time=2.0, question_dur=resp_dur, verbose=True)
-    pickle.dump({'designs': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
+    print("\n *** DESIGNS CREATION ***")
+    # itis = np.load(iti_filename)
+    # designs, isi_maxs = generate_designs(nbr_designs, nbr_events, cond_counts, files_list, files_duration,
+    #                                      cond_of_files, cond_names, cond_groups, group_names, tmp, tmn, itis,
+    #                                      start_time=2.0, question_dur=resp_dur, verbose=True)
+    # pickle.dump({'designs': designs, 'isi_maxs': isi_maxs}, open(op.join(work_dir, "designs.pck"), "wb"))
+    data = pickle.load(open(op.join(work_dir, "designs.pck"), "rb"))
+    designs = data['designs']
+    isi_maxs = data['isi_maxs']
 
     # Compute efficiencies of each design for each contrasts
     print("\n *** EFFICIENCIES COMPUTATION ***")
-    efficiencies = compute_efficiencies(tr, designs, contrasts, isi_maxs, verbose=True)
+    efficiencies = compute_efficiencies(tr, designs, contrasts_def, isi_maxs, verbose=True)
     np.save(op.join(work_dir, "efficiencies.npy"), efficiencies)
 
+    # efficiencies = np.load(op.join(work_dir, "efficiencies.npy"))
+
     # Choose and plot best designs
-    print("\n *** SEARCHING FOR BEST DESGIN(S) ***")
-    bests_idx = find_best_designs(efficiencies, contrasts, n=n_sel)
-    np.save(op.join(work_dir, "bests_idx.npy"), bests_idx)
-
-    plot_n_matrix(bests_idx, designs, tr, fig_file=op.join(work_dir, "desgins_matrix_bests.png"))
-
-    system("mkdir {}".format(op.join(work_dir, "distribs_bests")))
-    for idx in bests_idx:
-        plot_distribs(idx, efficiencies, contrasts_names, fig_file=op.join(work_dir, "distribs_bests/{:06d}".format(
-            idx)))
-
-    # Choose and plot "Average" designs
-    print("\n *** SEARCHING FOR AVG DESGIN(S) ***")
-    avgs_idx = find_avg_designs(efficiencies, contrasts, n=n_sel)
-    np.save(op.join(work_dir, "avgs_idx.npy"), avgs_idx)
-
-    plot_n_matrix(avgs_idx, designs, tr, fig_file=op.join(work_dir, "desgins_matrix_avgs.png"))
-
-    system("mkdir {}".format(op.join(work_dir, "distribs_avgs")))
-    for idx in avgs_idx:
-        plot_distribs(idx, efficiencies, contrasts_names, fig_file=op.join(work_dir, "distribs_avgs/{:06d}".format(
-            idx)))
-
-    # Exportation to labview
-    print("\n *** CSV EXPORTATION ***")
-    print("Best design exportation...")
-    system("mkdir {}".format(op.join(work_dir, "export")))
-    for idx in bests_idx:
-        if responses is not None:
-            resp_v = [responses[j] for j in designs['trial_idx']]
-        else:
-            resp_v = None
-
-        to_labview(op.join(work_dir, "export/design_{:06d}.csv".format(idx)), designs[idx], question_cond="Question",
-                   question_txt="+", question_dur=resp_dur, responses_idx=resp_v)
+    # print("\n *** SEARCHING FOR BEST DESGIN(S) ***")
+    # bests_idx = find_best_designs(efficiencies, len(contrasts_def.keys()), n=n_sel)
+    # np.save(op.join(work_dir, "bests_idx.npy"), bests_idx)
+    #
+    # plot_n_matrix(bests_idx, designs, tr, fig_file=op.join(work_dir, "desgins_matrix_bests.png"))
+    #
+    # system("mkdir {}".format(op.join(work_dir, "distribs_bests")))
+    # for idx in bests_idx:
+    #     plot_distribs(idx, efficiencies, contrasts_names,
+    #                   fig_file=op.join(work_dir, "distribs_bests/{:06d}".format(idx)))
+    #
+    # # Choose and plot "Average" designs
+    # print("\n *** SEARCHING FOR AVG DESGIN(S) ***")
+    # avgs_idx = find_avg_designs(efficiencies, len(contrasts_def.keys()), n=n_sel)
+    # np.save(op.join(work_dir, "avgs_idx.npy"), avgs_idx)
+    #
+    # plot_n_matrix(avgs_idx, designs, tr, fig_file=op.join(work_dir, "desgins_matrix_avgs.png"))
+    #
+    # system("mkdir {}".format(op.join(work_dir, "distribs_avgs")))
+    # for idx in avgs_idx:
+    #     plot_distribs(idx, efficiencies, contrasts_names, fig_file=op.join(work_dir, "distribs_avgs/{:06d}".format(
+    #         idx)))
+    # bests_idx = np.load(op.join(work_dir, "bests_idx.npy"))
+    # # Exportation to labview
+    # print("\n *** CSV EXPORTATION ***")
+    # print("Best design exportation...")
+    # system("mkdir {}".format(op.join(work_dir, "export")))
+    # for idx in bests_idx:
+    #     if responses is not None:
+    #         resp_v = []
+    #         for file in designs[idx]['file']:
+    #             if file in files_list:
+    #                 f_idx = np.argwhere(files_list == file).flatten()[0]
+    #                 resp_v.append(responses[f_idx])
+    #             else:
+    #                 resp_v.append(0)
+    #     else:
+    #         resp_v = None
+    #
+    #     to_labview(op.join(work_dir, "export/design_{:06d}.csv".format(idx)), designs[idx], question_cond="Question",
+    #                question_txt="+", question_dur=resp_dur, responses_idx=resp_v)
 
     return
 

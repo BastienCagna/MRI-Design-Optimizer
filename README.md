@@ -1,21 +1,22 @@
 # MRI-Design-Optimizer
 
 This framework (will) provides a pipeline that compute the more
-efficient design of a brain MRI experiment.
+efficient design of a brain MRI experiment using randomly generated designs.
 
 ## Motivations
 This project is developped to improve the results obtained with MRI
 experimentation at the [INT (Institut des Neurosciences de la Timone)](http://www.int.univ-amu.fr/).
-Algothims used here are based on the works of K.J Frinston & al. (1999):
-Stochastic Designs in Event-Related fMRI and the article of Hanson
-(2015) on Design Efficiency.
+Algorithms used here are based on the works of K.J Frinston & al. (1999):
+Stochastic Designs in Event-Related fMRI and the article of Rik Hanson
+on Design Efficiency.
 
 ## Progress
 
 The project is new and not finished at all. Experimentation on an audio
 stimulation study is currently in progress.
+Some new parts have been added to the project concerning fMRI data analysis (GLM directory).
 
-## The pipeline
+## The Optimizer Pipeline
 The process is divided in five different parts:
 
 1. Create the parameters file
@@ -39,4 +40,5 @@ To do...
 (comming soon...)
 
 ## Example
-(comming soon...)
+Some examples that run the optimizer pipeline are available in the "examples" directory.
+tHose script have been used to test the pipeline and to apply it to real experiment runned by the INT team BANCO.

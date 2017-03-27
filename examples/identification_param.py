@@ -15,19 +15,19 @@ from design_optimisation.create_parameters_file import write_parameters_file
 
 # First: Read the stimuli database infos and set some paradigm variables
 
-stim_db = pd.read_csv("/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/stim_db.csv",
-                      sep="\t")
+stim_db = pd.read_csv("/hpc/banco/bastien.c/data/optim/identification/stim_db.csv", sep="\t")
 files_list = stim_db['File']
 durations = stim_db['Duration']
 conditions_names = stim_db['Condition']
 
 count_by_cond = np.ones((36,))
-cond_of_files = np.arange(36)
-iti_file = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/itis.npy"
-output_path = "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/new/"
+cond_of_files = conditions_names
+iti_file = "" # "/hpc/banco/bastien.c/data/fake_bids/sourcedata/paradigms/identification_task/itis.npy"
+output_path = "/hpc/banco/bastien.c/data/optim/identification/final_ans"
 tr = 0.955
 nbr_designs = 100000
 
+contrasts_def_file = "/hpc/banco/bastien.c/data/optim/identification/contrasts_def.txt"
 
 # Secondly, define tansitions table
 # Number of speakers
@@ -85,19 +85,23 @@ for i in range(tmn.shape[0]):
 
 
 # Finally, define the interresting contrasts
-contrasts = np.array([
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-    [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-    [-1, 1, 1, -1, -1, -1, 1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, -1, -1, 1, -1, -1, 1, 1, -1, 0]
-])
-contrasts_names = ["Speaker 1 vs. Speaker 2",
-                   "Speaker 2 vs. Speaker 3",
-                   "Speaker 1 vs. Speaker 3",
-                   "Low F0 vs. High F0"]
+# WARNING ANSWER IS SET TO 0 FOR EACH CONTRAST
+# contrasts = np.array([
+#     [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+#     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1,
+#      1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+#     [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+#      1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+#     [-1, 1, 1, -1, -1, -1, 1, -1, 1, 1, -1, -1, -1, 1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1,
+#      -1, -1, -1, 1, -1, -1, 1, 1, -1, 0, 0]
+# ])
+# contrasts_names = ["Speaker 1 vs. Speaker 2",
+#                    "Speaker 2 vs. Speaker 3",
+#                    "Speaker 1 vs. Speaker 3",
+#                    "Low F0 vs. High F0"]
 
 
-write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts, contrasts_names, durations,
-                      files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path, responses=responses_of_cond,
-                      question_dur=5.0)
+write_parameters_file(conditions_names, cond_of_files, groups, group_names, contrasts_def_file,
+                      durations, files_list, iti_file, nbr_designs, tmp, tmn, tr, output_path,
+                      responses=responses_of_cond, question_dur=5.0)
 

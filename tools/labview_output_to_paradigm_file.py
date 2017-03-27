@@ -119,7 +119,7 @@ def paradigm_to_mat(paradigm, mat_file):
 
     io.savemat(mat_file, mat_struct)
     print("MATLAB file saved at: {}".format(mat_file))
-dfgh
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
