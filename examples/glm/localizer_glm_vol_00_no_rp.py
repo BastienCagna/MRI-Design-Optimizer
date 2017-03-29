@@ -11,18 +11,18 @@ con_file = op.join(subject_dir, "sourcedata/paradigms/localizer/"
 datasets = [
    {
       "subject_name": "pilote-01",
-      "run_name": "utask-localizer_bold",
+      "run_name": "swutask-localizer_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/S00/"
-                   "Functional/Localizer/utask-localizer_bold.nii",
+                   "Functional/Localizer/new/swutask-localizer_bold.nii",
       "paradigm_file": op.join(subject_dir, "pilote-01/paradigms/"
                                             "utask-localizer_bold.tsv"),
       "tr": 0.975
    },
    {
       "subject_name": "sub-01",
-      "run_name": "usub-01_task-localizer-best_bold",
+      "run_name": "swusub-01_task-localizer-best_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/sub-01/"
-                   "func/session1/usub-01_task-localizer-best_bold.nii",
+                   "func/session1/swusub-01_task-localizer-best_bold.nii",
       "paradigm_file": op.join(subject_dir,
                                "sub-01/paradigms/"
                                "usub-01_task-localizer-best_bold.tsv"),
@@ -30,9 +30,9 @@ datasets = [
    },
    {
       "subject_name": "sub-02",
-      "run_name": "usub-02_task-localizer-best_bold",
+      "run_name": "swusub-02_task-localizer-best_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/sub-02/"
-                   "func/usub-02_task-localizer-best_bold.nii",
+                   "func/swusub-02_task-localizer-best_bold.nii",
       "paradigm_file": op.join(subject_dir,
                                "sub-02/paradigms/"
                                "sub-02_task-localizer-best.tsv"),
