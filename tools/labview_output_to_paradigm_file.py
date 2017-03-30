@@ -98,22 +98,25 @@ def paradigm_to_mat(paradigm, mat_file):
     # MATLAB file
     mat_struct = {}
     cond_names = np.unique(paradigm['trial_type'])
-    mat_struct['names'] = cond_names
-    mat_struct['onsets'] = []
-    mat_struct['durations'] = []
-    onsets_tab = []
-    dur_tab = []
-    for cond in cond_names:
-        onsets_tab.append(np.array(paradigm['onset'][np.array(paradigm['trial_type']) == cond], dtype=object))
+    nbr_cond = len(cond_names)
+    names_tab = np.empty((nbr_cond,), dtype=object)
+    onsets_tab = np.empty((nbr_cond,), dtype=object)
+    dur_tab = np.empty((nbr_cond,), dtype=object)
+    for i, cond in enumerate(cond_names):
+        names_tab[i] = cond
+
+        sel = np.array(paradigm['trial_type']) == cond
+        onsets_tab[i] = np.array(paradigm['onset'][sel])
 
         # Questions are just an event, so duration is set to 0
         if cond == "Question" or cond == "question":
-            dur_tab.append(0)
+            dur_tab[i] = 0
         else:
-            dur_tab.append(np.array(paradigm['duration'][np.array(paradigm['trial_type']) == cond], dtype=object))
+            dur_tab[i] = np.array(paradigm['duration'][sel])
 
-    mat_struct['onsets'].append(onsets_tab)
-    mat_struct['durations'].append(dur_tab)
+    mat_struct['names'] = names_tab
+    mat_struct['onsets'] = onsets_tab
+    mat_struct['durations'] = dur_tab
 
     io.savemat(mat_file, mat_struct)
     print("MATLAB file saved: {}".format(mat_file))
@@ -199,7 +202,7 @@ if __name__ == "__main__":
 
                 if args.db_file is not None:
                     # Get true durations
-                    paradigm = labview_to_paradigm(paradigm, args.db_file,
+                    paradigm = labview_to_paradigm(paradigm, stim_db,
                                                    is_question=args.is_question)
                 paradigm_df = pd.DataFrame(paradigm)
             else:
