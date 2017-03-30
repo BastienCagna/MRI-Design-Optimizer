@@ -1,9 +1,10 @@
 import pandas as pd
 import numpy as np
-import sys
 import warnings
 import scipy.io as io
 import os.path as op
+import argparse
+from os import listdir
 
 
 def set_real_onsets(paradigm, stim_db, is_a_question_step, start_with_iti=True):
@@ -52,25 +53,19 @@ def set_real_onsets(paradigm, stim_db, is_a_question_step, start_with_iti=True):
     return output
 
 
-def labview_to_paradigm(labview_file, stim_db_file, is_question=False):
-    data = pd.read_csv(labview_file, sep="\t")
-
-    # Get useful data from the labview output file
-    paradigm = {'trial_type': data['CONDITION'], 'file': data['SON'], 'onset': data['ONSETS_MS']/1000.0,
-                'expected_answer': data['RESPONSE'], 'answer': data['REPONSE_1'],
-                'reaction_time': data['TEMPS_REACTION']/1000.0}
-
-    # Load file info
-    print("Reading stim database info file: {}".format(stim_db_file))
-    stim_db = pd.read_csv(stim_db_file, sep="\t")
-
+def labview_to_paradigm(paradigm, stim_db, is_question=False):
     # Set real onset (based on the real duration of the stimuli)
-    good_paradigm = set_real_onsets(paradigm, stim_db, is_a_question_step=is_question, start_with_iti=True)
+    good_paradigm = set_real_onsets(paradigm, stim_db,
+                                    is_a_question_step=is_question,
+                                    start_with_iti=True)
 
-    # Compute duration to add them to the paradigm after having remove the last onset
-    durations = np.array(good_paradigm['onset'][1:]) - np.array(good_paradigm['onset'][:-1])
+    # Compute duration to add them to the paradigm after having remove the last
+    # onset
+    durations = np.array(good_paradigm['onset'][1:]) \
+        - np.array(good_paradigm['onset'][:-1])
 
-    # Remove the endding onset (this onset is only used to handle the duration of the last ITI)
+    # Remove the endding onset (this onset is only used to handle the duration
+    # of the last ITI)
     last_paradigm = {}
     for key in paradigm.keys():
         last_paradigm[key] = np.array(good_paradigm[key])[:-1]
@@ -78,22 +73,25 @@ def labview_to_paradigm(labview_file, stim_db_file, is_question=False):
     # Set duration of each onset
     last_paradigm['duration'] = durations
 
-    return pd.DataFrame(last_paradigm)
+    return last_paradigm
 
 
 def remove_conditions(para_df, conditions_list):
     tmp_para = para_df.copy()
     for cond in conditions_list:
-        idx_to_remove = np.argwhere(np.array(tmp_para['trial_type']) == cond).flatten()
-        tmp_para = tmp_para.drop(idx_to_remove)
+        trials = np.array(tmp_para['trial_type'])
+        idx_to_remove = np.argwhere(trials == cond).flatten()
+        keys = tmp_para['trial_type'].keys()
+        tmp_para = tmp_para.drop(keys[idx_to_remove])
     return tmp_para
 
 
-def paradigm_to_csv(para_df, csv_file):
+def paradigm_to_tsv(para_df, tsv_file):
     # CSV file
-    para_df.to_csv(csv_file, sep=",", index=False, columns=['onset', 'trial_type', 'file', 'duration',
-                                                            'expected_answer', 'answer', 'reaction_time'])
-    print("CSV file saved at: {}".format(csv_file))
+    para_df.to_csv(tsv_file, sep="\t", index=False,
+                   columns=['onset', 'trial_type', 'file', 'duration',
+                            'expected_answer', 'answer', 'reaction_time'])
+    print("TSV file saved: {}".format(tsv_file))
 
 
 def paradigm_to_mat(paradigm, mat_file):
@@ -118,44 +116,119 @@ def paradigm_to_mat(paradigm, mat_file):
     mat_struct['durations'].append(dur_tab)
 
     io.savemat(mat_file, mat_struct)
-    print("MATLAB file saved at: {}".format(mat_file))
+    print("MATLAB file saved: {}".format(mat_file))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Labview file to CSV\n")
-        print("Create .csv file from the labview output file given by scan center.")
-        print("\nOnsets are corrected to match the real duration of each stimulation and last onset is removed. New "
-              "file is saved in the same directory than the input file with suffixe.")
-        print("\nArgs:\n\t[1]  Labview file\n\t[2]  Database file")
-        print("\t[3]  (opt.) If the paradigm use questions set this argument to 1. Default value is 0.\n")
-        exit(0)
+    parser = argparse.ArgumentParser(
+        description="Modify paradigm files contained in a directory to process "
+                    "GLM or MVPA analysis.")
+    parser.add_argument("dir", metavar='DIR', type=str,
+                        help="Input directory where original")
+    parser.add_argument("-db", dest="db_file", metavar='DATABASE_FILE',
+                        type=str, help="Stimuli database file")
+    parser.add_argument("-outdir", dest="out", type=str, default=None,
+                        help="Output directory where original")
+    parser.add_argument("-suffix", dest="suffix", type=str,
+                        default="_events.tsv",
+                        help="Suffix of the processed files (with extension)")
+    parser.add_argument("-ftype", dest="ftype", type=str,
+                        default="tsv", choices=['tsv', 'labview'],
+                        help="Type of the input files")
+    parser.add_argument("-noORIG", dest="noORIG", action='store_const',
+                        const=True, default=False,
+                        help="Unable creation of the original labview file as "
+                             ".tsv")
+    parser.add_argument("-noGLM", dest="noGLM", action='store_const',
+                        const=True, default=False,
+                        help="Unable creation of GLM versions")
+    parser.add_argument("-noMVPA", dest="noMVPA", action='store_const',
+                        const=True, default=False,
+                        help="Unable creation of MVPA versions")
+    parser.add_argument("-noTSV", dest="noTSV", action='store_const',
+                        const=True, default=False,
+                        help="Unable creation of .tsv version")
+    parser.add_argument("-noMAT", dest="noMAT", action='store_const',
+                        const=True, default=False,
+                        help="Unable creation of .mat version")
+    parser.add_argument("-rmtrials", dest="rmtrials", nargs='*', type=str,
+                        default=["ISI", "ITI", "[END]"],
+                        help="List of removed trial_types")
+    parser.add_argument("-quest", dest="is_question", action='store_const',
+                        const=True, default=False,
+                        help="Set this flag if there is a question event.")
+    args = parser.parse_args()
 
-    lab_file = sys.argv[1]
-    db_file = sys.argv[2]
-
-    if len(sys.argv) > 3:
-        is_question = sys.argv[3]
+    # Get output directory
+    if args.out is None:
+        outdir = args.dir
     else:
-        is_question = False
+        outdir = args.out
 
-    paradigm_df = labview_to_paradigm(lab_file, db_file, is_question=is_question)
+    suffix = args.suffix
+    suffix_len = len(suffix)
 
-    # The paradigm structure is now completed and right. Next step is to save it in .csv
-    txt_file = lab_file[:-4] + "_original.csv"
-    paradigm_to_csv(paradigm_df, txt_file)
+    print("Files type: {}".format(args.ftype))
+    print("Orignal file(s) must end with: {}".format(suffix))
+    print("Trials to remove: {}".format(args.rmtrials))
 
-    # Filter to remove ISI onsets
-    paradigm_df = remove_conditions(paradigm_df, ["ISI", "ITI"])
+    if args.db_file is not None:
+        # Load file info
+        stim_db = pd.read_csv(args.db_file, sep="\t")
 
-    filt_txt_file = lab_file[:-4]
+    # List all files contained in the input directory
+    tsv_files = listdir(args.dir)
 
-    # Save the filtered csv and matlab files
-    paradigm_to_csv(paradigm_df, filt_txt_file + "_glm.csv")
-    paradigm_to_mat(paradigm_df, filt_txt_file + "_glm.mat")
+    for tsv_file in tsv_files:
+        # Process only files that have good name
+        if len(tsv_file) > suffix_len and tsv_file[-suffix_len:] == suffix:
 
-    # MVPA use one regressor for each file
-    paradigm_df['trial_type'] = paradigm_df['file']
-    # TODO: order conditions (anne betty chloe)
-    paradigm_to_csv(paradigm_df, filt_txt_file + "_mvpa.csv")
-    # paradigm_to_mat(paradigm_df, filt_txt_file + "_mvpa.mat")
+            print("\nNew input: {}".format(tsv_file))
+            data = pd.read_csv(op.join(args.dir, tsv_file), sep="\t")
+
+            if args.ftype == "labview":
+                # Get useful data from the labview output file
+                paradigm = {
+                    'trial_type': data['CONDITION'],
+                    'file': data['SON'],
+                    'onset': data['ONSETS_MS'] / 1000.0,
+                    'expected_answer': data['RESPONSE'],
+                    'answer': data['REPONSE_1'],
+                    'reaction_time': data['TEMPS_REACTION'] / 1000.0
+                }
+
+                if args.db_file is not None:
+                    # Get true durations
+                    paradigm = labview_to_paradigm(paradigm, args.db_file,
+                                                   is_question=args.is_question)
+                paradigm_df = pd.DataFrame(paradigm)
+            else:
+                paradigm_df = pd.DataFrame(data)
+
+            # New files will have same name that input with different suffixes
+            new_filename = op.join(outdir, tsv_file[:-4])
+
+            if args.ftype == "labview" and args.noORIG is False:
+                # The paradigm structure is now completed and right.
+                # Next step is to save it in .tsv
+                txt_file = new_filename + "_original.tsv"
+                paradigm_to_tsv(paradigm_df, txt_file)
+
+            # Filter to remove some unused onsets
+            paradigm_df = remove_conditions(paradigm_df, args.rmtrials)
+
+            # Save the filtered csv and matlab files
+            if args.noGLM is False:
+                if args.noTSV is False:
+                    paradigm_to_tsv(paradigm_df, new_filename + "_glm.tsv")
+                if args.noMAT is False:
+                    paradigm_to_mat(paradigm_df, new_filename + "_glm.mat")
+
+            # MVPA use one regressor for each file
+            if args.noMVPA is False and args.ftype == "labview":
+                paradigm_df['trial_type'] = paradigm_df['file']
+                # TODO: order conditions (anne betty chloe)
+                if args.noTSV is False:
+                    paradigm_to_tsv(paradigm_df, new_filename + "_mvpa.tsv")
+                if args.noMAT is False:
+                    paradigm_to_mat(paradigm_df, new_filename + "_mvpa.mat")
