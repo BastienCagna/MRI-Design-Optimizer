@@ -7,11 +7,12 @@ output_dir_suffix = "_00_no_rp"
 subject_dir = "/hpc/banco/bastien.c/data/inter_tva/"
 con_file = op.join(subject_dir, "sourcedata/paradigms/localizer/"
                                 "contrasts_localizer.txt")
+prefix_dat = 'swu'
 
 datasets = [
    {
       "subject_name": "pilote-01",
-      "run_name": "swutask-localizer_bold",
+      "run_name": prefix_dat + "task-localizer_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/S00/"
                    "Functional/Localizer/new/swutask-localizer_bold.nii",
       "paradigm_file": op.join(subject_dir, "pilote-01/paradigms/"
@@ -20,9 +21,10 @@ datasets = [
    },
    {
       "subject_name": "sub-01",
-      "run_name": "swusub-01_task-localizer-best_bold",
+      "run_name": prefix_dat + "sub-01_task-localizer-best_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/sub-01/"
-                   "func/session1/swusub-01_task-localizer-best_bold.nii",
+                   "func/session1/" + prefix_dat +
+                   "sub-01_task-localizer-best_bold.nii",
       "paradigm_file": op.join(subject_dir,
                                "sub-01/paradigms/"
                                "usub-01_task-localizer-best_bold.tsv"),
@@ -30,9 +32,9 @@ datasets = [
    },
    {
       "subject_name": "sub-02",
-      "run_name": "swusub-02_task-localizer-best_bold",
+      "run_name": prefix_dat + "sub-02_task-localizer-best_bold",
       "fmri_file": "/hpc/banco/InterTVA/virginia/analyse_pilot/sub-02/"
-                   "func/swusub-02_task-localizer-best_bold.nii",
+                   "func/" + prefix_dat + "sub-02_task-localizer-best_bold.nii",
       "paradigm_file": op.join(subject_dir,
                                "sub-02/paradigms/"
                                "sub-02_task-localizer-best.tsv"),
