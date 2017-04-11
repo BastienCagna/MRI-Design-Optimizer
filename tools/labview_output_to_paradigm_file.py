@@ -97,6 +97,7 @@ def paradigm_to_tsv(para_df, tsv_file):
 def paradigm_to_mat(paradigm, mat_file):
     # MATLAB file
     mat_struct = {}
+
     cond_names = np.unique(paradigm['trial_type'])
     nbr_cond = len(cond_names)
     names_tab = np.empty((nbr_cond,), dtype=object)
@@ -125,18 +126,18 @@ def paradigm_to_mat(paradigm, mat_file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Modify paradigm files contained in a directory to process "
-                    "GLM or MVPA analysis.")
+                    "GLM or MVPA glm.")
     parser.add_argument("dir", metavar='DIR', type=str,
-                        help="Input directory where original")
+                        help="Input directory where are the original files")
     parser.add_argument("-db", dest="db_file", metavar='DATABASE_FILE',
                         type=str, help="Stimuli database file")
     parser.add_argument("-outdir", dest="out", type=str, default=None,
                         help="Output directory where original")
-    parser.add_argument("-suffix", dest="suffix", type=str,
-                        default="_events.tsv",
-                        help="Suffix of the processed files (with extension)")
+    parser.add_argument("-namefilt", dest="namefilt", type=str, default="",
+                        help="Process only file that contain this string in "
+                             "their names")
     parser.add_argument("-ftype", dest="ftype", type=str,
-                        default="tsv", choices=['tsv', 'labview'],
+                        default="labview", choices=['tsv', 'labview'],
                         help="Type of the input files")
     parser.add_argument("-noORIG", dest="noORIG", action='store_const',
                         const=True, default=False,
@@ -168,11 +169,8 @@ if __name__ == "__main__":
     else:
         outdir = args.out
 
-    suffix = args.suffix
-    suffix_len = len(suffix)
-
     print("Files type: {}".format(args.ftype))
-    print("Orignal file(s) must end with: {}".format(suffix))
+    print("Orignal file(s) must contain: {}".format(args.namefilt))
     print("Trials to remove: {}".format(args.rmtrials))
 
     if args.db_file is not None:
@@ -184,8 +182,9 @@ if __name__ == "__main__":
 
     for tsv_file in tsv_files:
         # Process only files that have good name
-        if len(tsv_file) > suffix_len and tsv_file[-suffix_len:] == suffix:
-
+        if args.namefilt in tsv_file and (
+                (args.ftype == "labview" and tsv_file[-4:] == ".txt") or
+                (args.ftype == "tsv" and tsv_file[-4:] == ".tsv")):
             print("\nNew input: {}".format(tsv_file))
             data = pd.read_csv(op.join(args.dir, tsv_file), sep="\t")
 
