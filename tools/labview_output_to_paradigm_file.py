@@ -78,6 +78,11 @@ def labview_to_paradigm(paradigm, stim_db, is_question=False):
 
 def remove_conditions(para_df, conditions_list):
     tmp_para = para_df.copy()
+
+    # Always remove the last onset
+    tmp_para = tmp_para.drop(tmp_para.index[len(tmp_para)-1])
+
+    # Remove listed trial_type
     for cond in conditions_list:
         trials = np.array(tmp_para['trial_type'])
         idx_to_remove = np.argwhere(trials == cond).flatten()
@@ -127,15 +132,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Modify paradigm files contained in a directory to process "
                     "GLM or MVPA glm.")
-    parser.add_argument("dir", metavar='DIR', type=str,
-                        help="Input directory where are the original files")
+    parser.add_argument("file", metavar='FILE', type=str, help="Original file")
     parser.add_argument("-db", dest="db_file", metavar='DATABASE_FILE',
                         type=str, help="Stimuli database file")
-    parser.add_argument("-outdir", dest="out", type=str, default=None,
-                        help="Output directory where original")
-    parser.add_argument("-namefilt", dest="namefilt", type=str, default="",
-                        help="Process only file that contain this string in "
-                             "their names")
+    parser.add_argument("-outTemplate", dest="out", type=str, default=None,
+                        help="Output filename template")
     parser.add_argument("-ftype", dest="ftype", type=str,
                         default="labview", choices=['tsv', 'labview'],
                         help="Type of the input files")
@@ -156,81 +157,84 @@ if __name__ == "__main__":
                         const=True, default=False,
                         help="Unable creation of .mat version")
     parser.add_argument("-rmtrials", dest="rmtrials", nargs='*', type=str,
-                        default=["ISI", "ITI", "[END]"],
+                        default=["ISI", "ITI", "[END]", "END"],
                         help="List of removed trial_types")
     parser.add_argument("-quest", dest="is_question", action='store_const',
                         const=True, default=False,
                         help="Set this flag if there is a question event.")
     args = parser.parse_args()
 
-    # Get output directory
-    if args.out is None:
-        outdir = args.dir
-    else:
-        outdir = args.out
-
-    print("Files type: {}".format(args.ftype))
-    print("Orignal file(s) must contain: {}".format(args.namefilt))
-    print("Trials to remove: {}".format(args.rmtrials))
+    print("File type: {}".format(args.ftype))
+    print("Removed trials: {}".format(args.rmtrials))
 
     if args.db_file is not None:
         # Load file info
         stim_db = pd.read_csv(args.db_file, sep="\t")
 
-    # List all files contained in the input directory
-    tsv_files = listdir(args.dir)
+    indir = op.dirname(args.file)
+    files = listdir(indir)
+    file = op.basename(args.file)
+    print("Searching for: {}\n\tin: {}".format(file, indir))
+    tsv_files = []
+    for f in files:
+        if file in f and ((args.ftype == "labview" and f[-3:] == "txt") or
+                          (args.ftype == "tsv" and f[-3:] == "tsv")):
+            tsv_files.append(op.join(indir, f))
+    if len(tsv_files) == 0:
+        print("No file found.")
+        exit(0)
 
     for tsv_file in tsv_files:
-        # Process only files that have good name
-        if args.namefilt in tsv_file and (
-                (args.ftype == "labview" and tsv_file[-4:] == ".txt") or
-                (args.ftype == "tsv" and tsv_file[-4:] == ".tsv")):
-            print("\nNew input: {}".format(tsv_file))
-            data = pd.read_csv(op.join(args.dir, tsv_file), sep="\t")
+        print("\nFile: {}".format(tsv_file))
+        data = pd.read_csv(op.join(indir, tsv_file), sep="\t")
 
-            if args.ftype == "labview":
-                # Get useful data from the labview output file
-                paradigm = {
-                    'trial_type': data['CONDITION'],
-                    'file': data['SON'],
-                    'onset': data['ONSETS_MS'] / 1000.0,
-                    'expected_answer': data['RESPONSE'],
-                    'answer': data['REPONSE_1'],
-                    'reaction_time': data['TEMPS_REACTION'] / 1000.0
-                }
+        if args.ftype == "labview":
+            # Get useful data from the labview output file
+            paradigm = {
+                'trial_type': data['CONDITION'],
+                'file': data['SON'],
+                'onset': data['ONSETS_MS'] / 1000.0,
+                'expected_answer': data['RESPONSE'],
+                'answer': data['REPONSE_1'],
+                'reaction_time': data['TEMPS_REACTION'] / 1000.0
+            }
 
-                if args.db_file is not None:
-                    # Get true durations
-                    paradigm = labview_to_paradigm(paradigm, stim_db,
-                                                   is_question=args.is_question)
-                paradigm_df = pd.DataFrame(paradigm)
-            else:
-                paradigm_df = pd.DataFrame(data)
+            if args.db_file is not None:
+                # Get true durations
+                paradigm = labview_to_paradigm(paradigm, stim_db,
+                                               is_question=args.is_question)
+            paradigm_df = pd.DataFrame(paradigm)
+        else:
+            paradigm_df = pd.DataFrame(data)
 
-            # New files will have same name that input with different suffixes
-            new_filename = op.join(outdir, tsv_file[:-4])
+        # New files will have same name that input with different suffixes
+        new_filename = args.out
 
-            if args.ftype == "labview" and args.noORIG is False:
-                # The paradigm structure is now completed and right.
-                # Next step is to save it in .tsv
-                txt_file = new_filename + "_original.tsv"
-                paradigm_to_tsv(paradigm_df, txt_file)
+        if args.ftype == "labview" and args.noORIG is False:
+            # The paradigm structure is now completed and right.
+            # Next step is to save it in .tsv
+            txt_file = new_filename + "_model-raw_events.tsv"
+            paradigm_to_tsv(paradigm_df, txt_file)
 
-            # Filter to remove some unused onsets
-            paradigm_df = remove_conditions(paradigm_df, args.rmtrials)
+        # Filter to remove some unused onsets
+        paradigm_df = remove_conditions(paradigm_df, args.rmtrials)
 
-            # Save the filtered csv and matlab files
-            if args.noGLM is False:
-                if args.noTSV is False:
-                    paradigm_to_tsv(paradigm_df, new_filename + "_glm.tsv")
-                if args.noMAT is False:
-                    paradigm_to_mat(paradigm_df, new_filename + "_glm.mat")
+        # Save the filtered csv and matlab files
+        if args.noGLM is False:
+            if args.noTSV is False:
+                paradigm_to_tsv(paradigm_df, new_filename +
+                                "_model-glm_events.tsv")
+            if args.noMAT is False:
+                paradigm_to_mat(paradigm_df, new_filename +
+                                "_model-glm_events.mat")
 
-            # MVPA use one regressor for each file
-            if args.noMVPA is False and args.ftype == "labview":
-                paradigm_df['trial_type'] = paradigm_df['file']
-                # TODO: order conditions (anne betty chloe)
-                if args.noTSV is False:
-                    paradigm_to_tsv(paradigm_df, new_filename + "_mvpa.tsv")
-                if args.noMAT is False:
-                    paradigm_to_mat(paradigm_df, new_filename + "_mvpa.mat")
+        # MVPA use one regressor for each file
+        if args.noMVPA is False and args.ftype == "labview":
+            paradigm_df['trial_type'] = paradigm_df['file']
+            # TODO: order conditions (anne betty chloe)
+            if args.noTSV is False:
+                paradigm_to_tsv(paradigm_df, new_filename +
+                                "_model-mvpa_events.tsv")
+            if args.noMAT is False:
+                paradigm_to_mat(paradigm_df, new_filename +
+                                "_model-mvpa_events.mat")

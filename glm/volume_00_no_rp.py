@@ -77,7 +77,7 @@ def run_glm(tr, slice_time_ref, paradigm_file, fmri_img, output_dir,
     print("Design matrix save as: {}".format(design_matrix_png_filename))
     # plot_design_matrix(d_matrix)
 
-    # **** Perform first level analysis ****
+    # **** Perform first level glm ****
     # Setup and fit GLM
     print("Run GLM")
     first_level_model = FirstLevelModel(tr, slice_time_ref,
@@ -127,7 +127,7 @@ def glm(sub_dir, sub, run, fmri_img, paradigm_file, contrasts_list_file=None,
     slice_time_ref = tr / nbr_slice_by_tr
 
     # Projected fMRI data
-    output_dir = op.join(sub_dir, sub, 'output', run, 'glm_vol')
+    output_dir = op.join(sub_dir, sub, 'output', 'glm_vol', run)
 
     first_level_model, cntrst = run_glm(tr, slice_time_ref, paradigm_file,
                                         fmri_img, output_dir,

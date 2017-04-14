@@ -53,7 +53,7 @@ from design_optimisation.contrast_definition import get_contrasts_list, parse_co
 #     # Plot the design matrix
 #     plot_design_matrix(d_matrix)
 #
-#     # **** Perform first level analysis ****
+#     # **** Perform first level glm ****
 #     # Setup and fit GLM
 #     first_level_surf_model = FirstLevelSurfaceModel(tr, slice_time_ref, hrf_model='glover + derivative')
 #     first_level_surf_model = first_level_surf_model.fit(fmri_img, design_matrices=d_matrix)
@@ -111,7 +111,7 @@ def run_glm(tr, slice_time_ref, paradigm_file, fmri_img, motion_file=None):
         t_vect = tr * np.arange(nbr_vol)
         d_matrix = make_design_matrix(t_vect, paradigm=paradigm, drift_model='blank')
 
-    # **** Perform first level analysis ****
+    # **** Perform first level glm ****
     # Setup and fit GLM
     first_level_surf_model = FirstLevelSurfaceModel(tr, slice_time_ref, hrf_model='glover + derivative')
     first_level_surf_model = first_level_surf_model.fit(fmri_img, design_matrices=d_matrix)

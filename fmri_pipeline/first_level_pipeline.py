@@ -94,62 +94,36 @@ def copy_files(log_f, source_dir, target_dir, subj):
     run_cmd("gunzip {}/func/*.nii.gz".format(target_dir), log_f)
 
 
-def hcp_minimal_preprocessing(sub, hcp_outdir, t1_file, t2_file):
+def hcp_minimal_preprocessing(log_f, sub_dir, subj, t1_file, t2_file):
     """Create surface using T1 and T2 images (HCP Pipeline)
 
-    :param sub: Subject name
+    :param subj: Subject name
     :param hcp_outdir: Subject HCP output directory
     :param t1_file: Path to T1 image
     :param t2_file:  Path to T2 image
     :return: Results are stored in hcp_outdir/sub/ by the HCP pipeline.
     """
-    log_msg(log, "HCP PIPELINE", print_time=True)
+    scripts_dir = "{}/sourcedata/scripts/batch".format(sub_dir)
+    hcp_stp = op.join(scripts_dir, "hcp_setup.sh")
 
     # Config
-    run_cmd("freesurfer_setup")
-    run_cmd("HCP_pipeline_setup")
+    log_msg(log, "** HCP setup **", print_time=True, blank_line=True)
+    run_cmd("mkdir {}/hcp".format(op.join(sub_dir, sub)))
 
     # Pre-freesurfer
-    cmd = "${HCPPIPEDIR}/PreFreeSurfer/PreFreeSurferPipeline.sh " \
-          "--path={} --subject={} --t1={} --t2={} " \
-          "--t1template ${HCPPIPEDIR_Templates}/MNI152_T1_0.8mm.nii.gz " \
-          "--t1templatebrain=${HCPPIPEDIR_Templates}/" \
-          "MNI152_T1_0.8mm_brain.nii.gz " \
-          "--t1template2mm=${HCPPIPEDIR_Templates}/MNI152_T1_2mm.nii.gz " \
-          "--t2templatebrain=${CPPIPEDIR_Templates}/" \
-          "MNI152_T2_0.8mm_brain.nii.gz " \
-          "--t2template2mm=${HCPPIPEDIR_Templates}/MNI152_T2_2mm.nii.gz " \
-          "--t2template=${HCPPIPEDIR_Templates}/MNI152_T2_0.8mm.nii.gz " \
-          "--templatemask=${HCPPIPEDIR_Templates}/" \
-          "MNI152_T1_0.8mm_brain_mask.nii.gz " \
-          "--template2mmmask=${HCPPIPEDIR_Templates}/" \
-          "MNI152_T1_2mm_brain_mask_dil.nii.gz " \
-          "--fnirtconfig=${HCPPIPEDIR_Config}/T1_2_MNI152_2mm.cnf " \
-          "--brainsize=150".format(hcp_outdir, sub, t1_file, t2_file)
-    run_cmd(cmd)
+    log_msg(log, "** Pre-FreeSurfer **", print_time=True, blank_line=True)
+    run_cmd("{}/hcp_pre-fs.sh {} {} {} {}".format(scripts_dir,
+            sub_dir, subj, t1_file, t2_file), log_f)
 
     # Freesurfer
-    hcp_outdir_sub = op.join(hcp_outdir, sub)
-    cmd = "${HCPPIPEDIR}/FreeSurfer/FreeSurferPipeline.sh "\
-          "--subject=$sub --subjectDIR={}/T1w " \
-          "--t1={}/MNINonLinear/T1w_restore.nii.gz " \
-          "--t1brain={}/MNINonLinear/T1w_restore_brain.nii.gz " \
-          "--t2={}/MNINonLinear/T2w_restore.nii.gz".format(
-           sub, hcp_outdir_sub, hcp_outdir_sub, hcp_outdir_sub, hcp_outdir_sub)
-    run_cmd(cmd)
+    log_msg(log, "** FreeSurfer **", print_time=True, blank_line=True)
+    run_cmd("{} && {}/hcp_fs.sh {} {}".format(hcp_stp, scripts_dir, sub_dir,
+                                              subj), log_f)
 
     # Post-freesurfer
-    cmd = "${HCPPIPEDIR}/PostFreeSurfer/PostFreeSurferPipeline.sh " \
-          "--path={} --subject={} " \
-          "--surfatlasdir=${HCPPIPEDIR_Templates}/standard_mesh_atlases " \
-          "--grayordinatesdir=${HCPPIPEDIR_Templates}/standard_mesh_atlases " \
-          "--grayordinatesres=1.60 --hiresmesh=164 --lowresmesh=32 " \
-          "--subcortgraylabels=${HCPPIPEDIR_Config}/" \
-          "FreeSurferSubcorticalLabelTableLut.txt " \
-          "--freesurferlabels=${HCPPIPEDIR_Config}/FreeSurferAllLut.txt " \
-          "--refmyelinmaps=${HCPPIPEDIR_Templates}/standard_mesh_atlases/" \
-          "Conte69.MyelinMap_BC.164k_fs_LR.dscalar.nii".format(hcp_outdir, sub)
-    run_cmd(cmd)
+    log_msg(log, "** Post-FreeSurfer **", print_time=True, blank_line=True)
+    run_cmd("{} && {}/hcp_post-fs.sh {} {}".format(hcp_stp, scripts_dir,
+                                                   sub_dir, subj), log_f)
 
 
 def spm_fmri_preprocessing(sub_dir, subj, t1_file):
@@ -240,6 +214,9 @@ if __name__ == "__main__":
                         help="Subject directory containing original data")
     parser.add_argument("-sub", dest="sub", type=str, help="Subject name")
 
+    parser.add_argument("-t1name", dest="t1name", default="_T1w.nii",
+                        help="T1 name will be: [sub][t1name]")
+
     # Process activation
     parser.add_argument("-all", dest="doAll", action='store_const',
                         const=True, default=False, help="Activate all steps.")
@@ -275,9 +252,6 @@ if __name__ == "__main__":
     parser.add_argument("-delOrigFunc", dest="doDelOrigFunc",
                         action='store_const', const=True, default=False,
                         help="Remove original functional files")
-
-    parser.add_argument("-t1name", dest="t1name", default="_T1w.nii",
-                        help="T1 name will be: [sub][t1name]")
     args = parser.parse_args()
 
     # --- INIT -----------------------------------------------------------------
@@ -289,19 +263,15 @@ if __name__ == "__main__":
     check_directories(subdir, sub)
 
     # Create a log file
-    log = open(op.join(subdir, sub, 'log.txt'), 'w')
+    log = open(op.join(subdir, sub, 'log.txt'), 'a')
     log_msg(log, "************************************************************"
                  "********************", blank_line=True)
     log_msg(log, "New call to the python pipeline.\n", print_time=True)
 
-    # Go to the output directory to be sur that new files create in the
-    # current directory will be in that directory
-    run_cmd("cd {}/output".format(op.join(subdir, sub)), log)
-
     # --- CONFIG ---------------------------------------------------------------
     # Check what must be done
     if args.doAll:
-        args.doPreproc = True
+        args.doPreProc = True
         args.doGlm = True
     if args.doPreProc:
         args.doCopy = True
@@ -328,11 +298,15 @@ if __name__ == "__main__":
                 blank_line=True, print_time=True)
         copy_files(log, args.indir, subdir, sub)
 
+    # Go to the output directory to be sur that new files create in the
+    # current directory will be in that directory
+    run_cmd("cd {}/output".format(op.join(subdir, sub)), log)
+
     # HCP
     if args.doHcp is True:
         log_msg(log, "*** HCP Pipeline", blank_line=True, print_time=True)
         hcp_outdir = op.join(subdir, sub, "hcp")
-        hcp_minimal_preprocessing(sub, hcp_outdir, t1_file, t2_file)
+        hcp_minimal_preprocessing(log, subdir, sub, t1_file, t2_file)
 
     # Fieldmap
     # if args.doFmap:
